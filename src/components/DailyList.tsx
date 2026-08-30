@@ -1,0 +1,104 @@
+import { closestCenter, DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import type { Entry, EntryType } from '../types'
+import { DailyRow } from './DailyRow'
+
+interface DailyListProps {
+  entries: Entry[]
+  completedEntries: Entry[]
+  type: EntryType
+  showCompleted: boolean
+  onToggleCompleted: () => void
+  onCheck: (entryId: string) => void
+  onReorder: (activeId: string, overId: string) => void
+}
+
+export function DailyList({ entries, completedEntries, type, showCompleted, onToggleCompleted, onCheck, onReorder }: DailyListProps) {
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const checkable = type !== 'thought'
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (over && active.id !== over.id) {
+      onReorder(String(active.id), String(over.id))
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {checkable && completedEntries.length > 0 && (
+        <CompletedStrip count={completedEntries.length} expanded={showCompleted} onToggle={onToggleCompleted} entries={completedEntries} />
+      )}
+
+      <div className="px-5 pt-1.5">
+        <span className="text-[11.5px] font-bold uppercase tracking-wide text-[var(--color-text-muted)]">Today</span>
+      </div>
+
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={entries.map((e) => e.id)} strategy={verticalListSortingStrategy}>
+          <div className="flex flex-col gap-3 px-5">
+            {entries.map((entry) => (
+              <DailyRow key={entry.id} entry={entry} checkable={checkable} onCheck={() => onCheck(entry.id)} />
+            ))}
+            {entries.length === 0 && <p className="py-4 text-center text-sm text-[var(--color-text-muted)]">Nothing here for today.</p>}
+          </div>
+        </SortableContext>
+      </DndContext>
+    </div>
+  )
+}
+
+function CompletedStrip({
+  count,
+  expanded,
+  onToggle,
+  entries,
+}: {
+  count: number
+  expanded: boolean
+  onToggle: () => void
+  entries: Entry[]
+}) {
+  return (
+    <div className="mx-5 flex flex-col gap-2 rounded-[20px] bg-[var(--glass-fill)] p-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex items-center justify-between rounded-full px-3.5 py-2.5"
+      >
+        <div className="flex items-center gap-2">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M8 12.5l2.5 2.5L16 9.5" />
+          </svg>
+          <span className="text-[12.5px] font-bold text-[var(--color-text)]">{count} completed today</span>
+        </div>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="var(--color-text)"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`opacity-55 transition-transform ${expanded ? 'rotate-180' : ''}`}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <div className="flex flex-col gap-2 px-2 pb-2">
+          {entries.map((entry) => (
+            <div key={entry.id} className="rounded-2xl bg-white/40 px-3.5 py-2.5">
+              <p className="text-[13.5px] font-medium text-[var(--color-text-muted)] line-through decoration-[var(--color-text-faint)]">
+                {entry.content}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

@@ -35,8 +35,10 @@ export function CategoryPicker({ allCategories, selectedIds, onChange, onCreateC
           key={cat.id}
           type="button"
           onClick={() => toggle(cat.id)}
-          className={`rounded-full px-2.5 py-0.5 text-xs ${
-            selectedIds.includes(cat.id) ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+            selectedIds.includes(cat.id)
+              ? 'bg-[var(--color-primary)] text-[var(--color-primary-on)]'
+              : 'bg-white/45 text-[var(--color-text-muted)]'
           }`}
         >
           {cat.name}
@@ -54,7 +56,7 @@ export function CategoryPicker({ allCategories, selectedIds, onChange, onCreateC
           }
         }}
         disabled={adding}
-        className="w-16 rounded-full border border-dashed border-slate-300 bg-transparent px-2 py-0.5 text-xs"
+        className="w-16 rounded-full border border-dashed border-[var(--glass-border)] bg-transparent px-2.5 py-1 text-xs text-[var(--color-text-muted)]"
       />
     </div>
   )

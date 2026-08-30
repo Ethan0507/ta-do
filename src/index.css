@@ -1,3 +1,40 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --font-display: 'Sora', system-ui, -apple-system, sans-serif;
+  --font-body: 'Manrope', system-ui, -apple-system, sans-serif;
+
+  --color-text: oklch(22% 0.02 285);
+  --color-text-muted: oklch(35% 0.02 285 / 0.62);
+  --color-text-faint: oklch(35% 0.02 285 / 0.45);
+
+  --color-primary: oklch(58% 0.16 290);
+  --color-primary-on: oklch(99% 0.01 290);
+  --color-secondary: oklch(58% 0.13 195);
+  --color-tertiary: oklch(66% 0.14 55);
+  --color-success: oklch(55% 0.13 145);
+
+  --glass-fill: oklch(99% 0.01 285 / 0.55);
+  --glass-fill-strong: oklch(99% 0.02 285 / 0.85);
+  --glass-border: oklch(100% 0 0 / 0.55);
+  --glass-shadow: 0 8px 30px oklch(25% 0.05 285 / 0.22), inset 0 1px 0 oklch(100% 0 0 / 0.5);
+
+  --app-bg: oklch(90% 0.02 285);
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-text);
+}
+
+/* react-swipeable-list base overrides to match the glass rows */
+.swipeable-list-item__content {
+  background: transparent !important;
+}
+.swipeable-list-item__leading-actions,
+.swipeable-list-item__trailing-actions {
+  border-radius: 20px;
+  overflow: hidden;
+}

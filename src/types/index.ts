@@ -18,6 +18,7 @@ export interface Entry {
   created_at: string
   archived_at: string | null
   habit_id: string | null
+  position: number | null
 
   // Task-specific
   due_date: string | null
