@@ -27,9 +27,9 @@ export function Library({ session, onBack }: LibraryProps) {
   const [showArchived, setShowArchived] = useState(false)
   const [typeFilter, setTypeFilter] = useState<EntryType | 'all'>('all')
   const [sortMode, setSortMode] = useState<SortMode>('category')
+  const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
   const [typeMenuOpen, setTypeMenuOpen] = useState(false)
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
-  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     const [entryRows, categoryRows, categoryMap] = await Promise.all([
@@ -79,8 +79,6 @@ export function Library({ session, onBack }: LibraryProps) {
     if (uncategorized.length > 0) result.push({ id: 'uncategorized', name: null, entries: uncategorized })
     return result
   }, [filtered, sortMode, entryCategoryIds, categories])
-
-  const selectedEntry = entries.find((e) => e.id === selectedEntryId) ?? null
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[var(--app-bg)]">
@@ -210,7 +208,7 @@ export function Library({ session, onBack }: LibraryProps) {
                 <button
                   key={entry.id}
                   type="button"
-                  onClick={() => setSelectedEntryId(entry.id)}
+                  onClick={() => setSelectedEntry(entry)}
                   className={`flex items-center gap-3 rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-fill)] px-3.5 py-3 text-left backdrop-blur-xl ${
                     entry.archived_at ? 'opacity-55' : ''
                   }`}
@@ -253,7 +251,7 @@ export function Library({ session, onBack }: LibraryProps) {
           userId={session.user.id}
           categories={categories}
           categoryIds={entryCategoryIds[selectedEntry.id] ?? []}
-          onClose={() => setSelectedEntryId(null)}
+          onClose={() => setSelectedEntry(null)}
           onChanged={reload}
         />
       )}

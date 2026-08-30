@@ -22,34 +22,53 @@ interface EntryDetailProps {
   onChanged: () => void
 }
 
+function sameIds(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  const setB = new Set(b)
+  return a.every((id) => setB.has(id))
+}
+
 export function EntryDetail({ entry, userId, categories, categoryIds, onClose, onChanged }: EntryDetailProps) {
   const [content, setContent] = useState(entry.content)
   const [type, setType] = useState<EntryType>(entry.type)
+  const [dueDate, setDueDate] = useState(entry.due_date ?? '')
+  const [localCategoryIds, setLocalCategoryIds] = useState<string[]>(categoryIds)
+  const [isDone, setIsDone] = useState(
+    entry.type === 'task' ? entry.task_status === 'done' : entry.type === 'goal' ? entry.goal_status === 'achieved' : false,
+  )
 
-  // While `type` has just changed but `entry` hasn't caught up via a reload yet,
-  // treat status as the fresh default rather than the stale value from the old type.
-  const isDone = type === entry.type && ((type === 'task' && entry.task_status === 'done') || (type === 'goal' && entry.goal_status === 'achieved'))
-
-  async function handleTypeChange(newType: EntryType) {
-    await updateEntryType(entry.id, newType)
+  function handleTypeChange(newType: EntryType) {
     setType(newType)
-    onChanged()
+    setIsDone(false)
   }
 
-  async function commitContent() {
-    if (content.trim() && content !== entry.content) {
-      await updateEntryContent(entry.id, content.trim())
-      onChanged()
+  const originalIsDone = entry.type === 'task' ? entry.task_status === 'done' : entry.type === 'goal' ? entry.goal_status === 'achieved' : false
+
+  const isDirty =
+    type !== entry.type ||
+    content.trim() !== entry.content ||
+    (type === 'task' && dueDate !== (entry.due_date ?? '')) ||
+    (type === entry.type && type !== 'thought' && isDone !== originalIsDone) ||
+    !sameIds(localCategoryIds, categoryIds)
+
+  async function handleSave() {
+    if (type !== entry.type) {
+      await updateEntryType(entry.id, type)
     }
-  }
-
-  async function handleToggleStatus() {
     if (type === 'task') {
-      await setTaskStatus(entry.id, isDone ? 'open' : 'done')
+      await setTaskStatus(entry.id, isDone ? 'done' : 'open')
+      await updateEntryDueDate(entry.id, dueDate || null)
     } else if (type === 'goal') {
-      await setGoalStatus(entry.id, isDone ? 'ongoing' : 'achieved')
+      await setGoalStatus(entry.id, isDone ? 'achieved' : 'ongoing')
+    }
+    if (content.trim() && content.trim() !== entry.content) {
+      await updateEntryContent(entry.id, content.trim())
+    }
+    if (!sameIds(localCategoryIds, categoryIds)) {
+      await setEntryCategories(entry.id, localCategoryIds)
     }
     onChanged()
+    onClose()
   }
 
   async function handleArchiveToggle() {
@@ -80,7 +99,6 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          onBlur={commitContent}
           rows={3}
           className="w-full resize-none rounded-2xl border-[1.5px] border-[var(--color-primary)] bg-white/45 px-[18px] py-3.5 text-[15px] text-[var(--color-text)] outline-none"
         />
@@ -90,8 +108,8 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
             <span className="text-xs font-semibold text-[var(--color-text-muted)]">Due date</span>
             <input
               type="date"
-              defaultValue={type === entry.type ? (entry.due_date ?? '') : ''}
-              onChange={(e) => updateEntryDueDate(entry.id, e.target.value || null).then(onChanged)}
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
               className="w-fit rounded-xl border border-[var(--glass-border)] bg-white/45 px-3 py-2 text-sm text-[var(--color-text)]"
             />
           </label>
@@ -100,7 +118,7 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
         {type !== 'thought' && (
           <button
             type="button"
-            onClick={handleToggleStatus}
+            onClick={() => setIsDone((d) => !d)}
             className={`w-fit rounded-full px-4 py-2 text-sm font-bold ${
               isDone ? 'bg-[var(--color-success)] text-[var(--color-primary-on)]' : 'bg-white/45 text-[var(--color-text)]'
             }`}
@@ -113,11 +131,30 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
           <span className="text-xs font-semibold text-[var(--color-text-muted)]">Categories</span>
           <CategoryPicker
             allCategories={categories}
-            selectedIds={categoryIds}
-            onChange={(ids) => setEntryCategories(entry.id, ids).then(onChanged)}
+            selectedIds={localCategoryIds}
+            onChange={setLocalCategoryIds}
             onCreateCategory={(name) => createCategory(userId, name).then(onChanged)}
           />
         </div>
+
+        {isDirty && (
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-full border border-[var(--glass-border)] bg-white/40 py-2.5 text-sm font-bold text-[var(--color-text-muted)]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="flex-1 rounded-full bg-[var(--color-primary)] py-2.5 text-sm font-bold text-[var(--color-primary-on)]"
+            >
+              Save changes
+            </button>
+          </div>
+        )}
 
         <button
           type="button"

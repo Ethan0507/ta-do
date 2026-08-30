@@ -11,9 +11,19 @@ interface DailyListProps {
   onToggleCompleted: () => void
   onCheck: (entryId: string) => void
   onReorder: (activeId: string, overId: string) => void
+  onOpenEntry: (entry: Entry) => void
 }
 
-export function DailyList({ entries, completedEntries, type, showCompleted, onToggleCompleted, onCheck, onReorder }: DailyListProps) {
+export function DailyList({
+  entries,
+  completedEntries,
+  type,
+  showCompleted,
+  onToggleCompleted,
+  onCheck,
+  onReorder,
+  onOpenEntry,
+}: DailyListProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const checkable = type !== 'thought'
 
@@ -27,7 +37,13 @@ export function DailyList({ entries, completedEntries, type, showCompleted, onTo
   return (
     <div className="flex flex-col gap-3">
       {checkable && completedEntries.length > 0 && (
-        <CompletedStrip count={completedEntries.length} expanded={showCompleted} onToggle={onToggleCompleted} entries={completedEntries} />
+        <CompletedStrip
+          count={completedEntries.length}
+          expanded={showCompleted}
+          onToggle={onToggleCompleted}
+          entries={completedEntries}
+          onOpenEntry={onOpenEntry}
+        />
       )}
 
       <div className="px-5 pt-1.5">
@@ -38,7 +54,13 @@ export function DailyList({ entries, completedEntries, type, showCompleted, onTo
         <SortableContext items={entries.map((e) => e.id)} strategy={verticalListSortingStrategy}>
           <div className="flex flex-col gap-3 px-5">
             {entries.map((entry) => (
-              <DailyRow key={entry.id} entry={entry} checkable={checkable} onCheck={() => onCheck(entry.id)} />
+              <DailyRow
+                key={entry.id}
+                entry={entry}
+                checkable={checkable}
+                onCheck={() => onCheck(entry.id)}
+                onOpen={() => onOpenEntry(entry)}
+              />
             ))}
             {entries.length === 0 && <p className="py-4 text-center text-sm text-[var(--color-text-muted)]">Nothing here for today.</p>}
           </div>
@@ -53,11 +75,13 @@ function CompletedStrip({
   expanded,
   onToggle,
   entries,
+  onOpenEntry,
 }: {
   count: number
   expanded: boolean
   onToggle: () => void
   entries: Entry[]
+  onOpenEntry: (entry: Entry) => void
 }) {
   return (
     <div className="mx-5 flex flex-col gap-2 rounded-[20px] bg-[var(--glass-fill)] p-1">
@@ -91,11 +115,16 @@ function CompletedStrip({
       {expanded && (
         <div className="flex flex-col gap-2 px-2 pb-2">
           {entries.map((entry) => (
-            <div key={entry.id} className="rounded-2xl bg-white/40 px-3.5 py-2.5">
+            <button
+              key={entry.id}
+              type="button"
+              onClick={() => onOpenEntry(entry)}
+              className="rounded-2xl bg-white/40 px-3.5 py-2.5 text-left"
+            >
               <p className="text-[13.5px] font-medium text-[var(--color-text-muted)] line-through decoration-[var(--color-text-faint)]">
                 {entry.content}
               </p>
-            </div>
+            </button>
           ))}
         </div>
       )}

@@ -1,21 +1,24 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import type { Entry, EntryType } from '../types'
+import type { Category, Entry, EntryType } from '../types'
 import {
   computeReorderedPosition,
   createEntry,
   fetchCompletedToday,
+  fetchEntryCategoryIds,
   fetchTodayEntries,
   getTopPosition,
   setGoalStatus,
   setTaskStatus,
   updateEntryPosition,
 } from '../lib/entries'
+import { fetchCategories } from '../lib/categories'
 import { GlassBackdrop } from '../components/GlassBackdrop'
 import { TypeSelector } from '../components/TypeSelector'
 import { DailyList } from '../components/DailyList'
 import { CaptureFab } from '../components/CaptureFab'
+import { EntryDetail } from '../components/EntryDetail'
 
 interface HomeProps {
   session: Session
@@ -27,10 +30,19 @@ export function Home({ session, onOpenLibrary }: HomeProps) {
   const [entries, setEntries] = useState<Entry[]>([])
   const [completedEntries, setCompletedEntries] = useState<Entry[]>([])
   const [showCompleted, setShowCompleted] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [entryCategoryIds, setEntryCategoryIds] = useState<Record<string, string[]>>({})
+  const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
 
   const reload = useCallback(async () => {
-    const todayEntries = await fetchTodayEntries(type)
+    const [todayEntries, categoryRows, categoryMap] = await Promise.all([
+      fetchTodayEntries(type),
+      fetchCategories(),
+      fetchEntryCategoryIds(),
+    ])
     setEntries(todayEntries)
+    setCategories(categoryRows)
+    setEntryCategoryIds(categoryMap)
     if (type === 'thought') {
       setCompletedEntries([])
     } else {
@@ -120,11 +132,23 @@ export function Home({ session, onOpenLibrary }: HomeProps) {
             onToggleCompleted={() => setShowCompleted((s) => !s)}
             onCheck={handleCheck}
             onReorder={handleReorder}
+            onOpenEntry={setSelectedEntry}
           />
         </div>
       </div>
 
       <CaptureFab type={type} onCapture={handleCapture} />
+
+      {selectedEntry && (
+        <EntryDetail
+          entry={selectedEntry}
+          userId={session.user.id}
+          categories={categories}
+          categoryIds={entryCategoryIds[selectedEntry.id] ?? []}
+          onClose={() => setSelectedEntry(null)}
+          onChanged={reload}
+        />
+      )}
     </div>
   )
 }

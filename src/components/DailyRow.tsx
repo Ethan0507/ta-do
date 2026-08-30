@@ -8,9 +8,10 @@ interface DailyRowProps {
   entry: Entry
   checkable: boolean
   onCheck: () => void
+  onOpen: () => void
 }
 
-export function DailyRow({ entry, checkable, onCheck }: DailyRowProps) {
+export function DailyRow({ entry, checkable, onCheck, onOpen }: DailyRowProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: entry.id,
   })
@@ -25,7 +26,10 @@ export function DailyRow({ entry, checkable, onCheck }: DailyRowProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className="flex w-full items-center gap-3 rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-fill)] px-4 py-3.5 shadow-[var(--glass-shadow)] backdrop-blur-xl"
+      onClick={checkable ? undefined : onOpen}
+      className={`flex w-full items-center gap-3 rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-fill)] px-4 py-3.5 shadow-[var(--glass-shadow)] backdrop-blur-xl ${
+        checkable ? '' : 'cursor-pointer'
+      }`}
     >
       {entry.type === 'thought' ? (
         <div className="mx-[6.5px] h-2 w-2 shrink-0 rounded-full bg-[var(--color-primary)]" />
@@ -43,6 +47,7 @@ export function DailyRow({ entry, checkable, onCheck }: DailyRowProps) {
         {...attributes}
         {...listeners}
         type="button"
+        onClick={(e) => e.stopPropagation()}
         className="shrink-0 touch-none text-[var(--color-text-muted)]"
         aria-label="Drag to reorder"
       >
@@ -62,6 +67,7 @@ export function DailyRow({ entry, checkable, onCheck }: DailyRowProps) {
       listType={Type.IOS}
       fullSwipe
       threshold={0.3}
+      onClick={onOpen}
       leadingActions={
         <LeadingActions>
           <SwipeAction onClick={onCheck}>
