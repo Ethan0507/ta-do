@@ -136,6 +136,20 @@ export async function updateEntryPosition(entryId: string, position: number): Pr
   if (error) throw error
 }
 
+export async function updateEntryType(entryId: string, type: EntryType): Promise<void> {
+  const { error } = await supabase
+    .from('entries')
+    .update({
+      type,
+      task_status: type === 'task' ? 'open' : null,
+      completed_at: null,
+      goal_status: type === 'goal' ? 'ongoing' : null,
+      achieved_at: null,
+    })
+    .eq('id', entryId)
+  if (error) throw error
+}
+
 export async function updateEntryContent(entryId: string, content: string): Promise<void> {
   const { error } = await supabase.from('entries').update({ content }).eq('id', entryId)
   if (error) throw error

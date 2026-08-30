@@ -9,3 +9,6 @@ dist-ssr
 # Supabase
 supabase/.branches
 supabase/.temp
+
+.vercel
+.env*

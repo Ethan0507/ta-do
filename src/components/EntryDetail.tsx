@@ -1,8 +1,17 @@
 import { useState } from 'react'
-import type { Category, Entry } from '../types'
-import { setArchived, setGoalStatus, setTaskStatus, setEntryCategories, updateEntryContent, updateEntryDueDate } from '../lib/entries'
+import type { Category, Entry, EntryType } from '../types'
+import {
+  setArchived,
+  setGoalStatus,
+  setTaskStatus,
+  setEntryCategories,
+  updateEntryContent,
+  updateEntryDueDate,
+  updateEntryType,
+} from '../lib/entries'
 import { createCategory } from '../lib/categories'
 import { CategoryPicker } from './CategoryPicker'
+import { TypeSelector } from './TypeSelector'
 
 interface EntryDetailProps {
   entry: Entry
@@ -15,6 +24,17 @@ interface EntryDetailProps {
 
 export function EntryDetail({ entry, userId, categories, categoryIds, onClose, onChanged }: EntryDetailProps) {
   const [content, setContent] = useState(entry.content)
+  const [type, setType] = useState<EntryType>(entry.type)
+
+  // While `type` has just changed but `entry` hasn't caught up via a reload yet,
+  // treat status as the fresh default rather than the stale value from the old type.
+  const isDone = type === entry.type && ((type === 'task' && entry.task_status === 'done') || (type === 'goal' && entry.goal_status === 'achieved'))
+
+  async function handleTypeChange(newType: EntryType) {
+    await updateEntryType(entry.id, newType)
+    setType(newType)
+    onChanged()
+  }
 
   async function commitContent() {
     if (content.trim() && content !== entry.content) {
@@ -24,10 +44,10 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
   }
 
   async function handleToggleStatus() {
-    if (entry.type === 'task') {
-      await setTaskStatus(entry.id, entry.task_status === 'done' ? 'open' : 'done')
-    } else if (entry.type === 'goal') {
-      await setGoalStatus(entry.id, entry.goal_status === 'achieved' ? 'ongoing' : 'achieved')
+    if (type === 'task') {
+      await setTaskStatus(entry.id, isDone ? 'open' : 'done')
+    } else if (type === 'goal') {
+      await setGoalStatus(entry.id, isDone ? 'ongoing' : 'achieved')
     }
     onChanged()
   }
@@ -55,7 +75,7 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
           </button>
         </div>
 
-        <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-muted)]">{entry.type}</span>
+        <TypeSelector value={type} onChange={handleTypeChange} />
 
         <textarea
           value={content}
@@ -65,35 +85,27 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
           className="w-full resize-none rounded-2xl border-[1.5px] border-[var(--color-primary)] bg-white/45 px-[18px] py-3.5 text-[15px] text-[var(--color-text)] outline-none"
         />
 
-        {entry.type === 'task' && (
+        {type === 'task' && (
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-semibold text-[var(--color-text-muted)]">Due date</span>
             <input
               type="date"
-              defaultValue={entry.due_date ?? ''}
+              defaultValue={type === entry.type ? (entry.due_date ?? '') : ''}
               onChange={(e) => updateEntryDueDate(entry.id, e.target.value || null).then(onChanged)}
               className="w-fit rounded-xl border border-[var(--glass-border)] bg-white/45 px-3 py-2 text-sm text-[var(--color-text)]"
             />
           </label>
         )}
 
-        {entry.type !== 'thought' && (
+        {type !== 'thought' && (
           <button
             type="button"
             onClick={handleToggleStatus}
             className={`w-fit rounded-full px-4 py-2 text-sm font-bold ${
-              (entry.type === 'task' ? entry.task_status === 'done' : entry.goal_status === 'achieved')
-                ? 'bg-[var(--color-success)] text-[var(--color-primary-on)]'
-                : 'bg-white/45 text-[var(--color-text)]'
+              isDone ? 'bg-[var(--color-success)] text-[var(--color-primary-on)]' : 'bg-white/45 text-[var(--color-text)]'
             }`}
           >
-            {entry.type === 'task'
-              ? entry.task_status === 'done'
-                ? 'Done'
-                : 'Mark done'
-              : entry.goal_status === 'achieved'
-                ? 'Achieved'
-                : 'Mark achieved'}
+            {type === 'task' ? (isDone ? 'Done' : 'Mark done') : isDone ? 'Achieved' : 'Mark achieved'}
           </button>
         )}
 
