@@ -7,6 +7,7 @@ import {
   setEntryCategories,
   updateEntryContent,
   updateEntryDueDate,
+  updateEntryNotes,
   updateEntryType,
 } from '../lib/entries'
 import { createCategory } from '../lib/categories'
@@ -30,6 +31,7 @@ function sameIds(a: string[], b: string[]): boolean {
 
 export function EntryDetail({ entry, userId, categories, categoryIds, onClose, onChanged }: EntryDetailProps) {
   const [content, setContent] = useState(entry.content)
+  const [notes, setNotes] = useState(entry.notes ?? '')
   const [type, setType] = useState<EntryType>(entry.type)
   const [dueDate, setDueDate] = useState(entry.due_date ?? '')
   const [localCategoryIds, setLocalCategoryIds] = useState<string[]>(categoryIds)
@@ -47,6 +49,7 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
   const isDirty =
     type !== entry.type ||
     content.trim() !== entry.content ||
+    notes.trim() !== (entry.notes ?? '') ||
     (type === 'task' && dueDate !== (entry.due_date ?? '')) ||
     (type === entry.type && type !== 'thought' && isDone !== originalIsDone) ||
     !sameIds(localCategoryIds, categoryIds)
@@ -63,6 +66,9 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
     }
     if (content.trim() && content.trim() !== entry.content) {
       await updateEntryContent(entry.id, content.trim())
+    }
+    if (notes.trim() !== (entry.notes ?? '')) {
+      await updateEntryNotes(entry.id, notes.trim())
     }
     if (!sameIds(localCategoryIds, categoryIds)) {
       await setEntryCategories(entry.id, localCategoryIds)
@@ -126,6 +132,17 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
             {type === 'task' ? (isDone ? 'Done' : 'Mark done') : isDone ? 'Achieved' : 'Mark achieved'}
           </button>
         )}
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold text-[var(--color-text-muted)]">Notes</span>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            placeholder="Add notes…"
+            className="w-full resize-none rounded-2xl border border-[var(--glass-border)] bg-white/45 px-[18px] py-3.5 text-[14px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+          />
+        </label>
 
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-semibold text-[var(--color-text-muted)]">Categories</span>

@@ -155,6 +155,11 @@ export async function updateEntryContent(entryId: string, content: string): Prom
   if (error) throw error
 }
 
+export async function updateEntryNotes(entryId: string, notes: string): Promise<void> {
+  const { error } = await supabase.from('entries').update({ notes: notes || null }).eq('id', entryId)
+  if (error) throw error
+}
+
 export async function updateEntryDueDate(entryId: string, dueDate: string | null): Promise<void> {
   const { error } = await supabase.from('entries').update({ due_date: dueDate }).eq('id', entryId)
   if (error) throw error

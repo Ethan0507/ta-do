@@ -15,6 +15,7 @@ export interface Entry {
   user_id: string
   type: EntryType
   content: string
+  notes: string | null
   created_at: string
   archived_at: string | null
   habit_id: string | null
