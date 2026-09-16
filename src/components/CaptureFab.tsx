@@ -33,9 +33,9 @@ export function CaptureFab({ type, onCapture }: CaptureFabProps) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="pointer-events-auto flex h-[60px] w-[60px] items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--glass-fill-strong)] shadow-[var(--glass-shadow)] backdrop-blur-2xl"
+          className="pointer-events-auto flex h-[60px] w-[60px] items-center justify-center rounded-full bg-[var(--color-primary)] shadow-[0_10px_26px_oklch(58%_0.16_290_/_0.45),0_0_0_6px_oklch(99%_0.01_285_/_0.5)]"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary-on)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 5v14M5 12h14" />
           </svg>
         </button>

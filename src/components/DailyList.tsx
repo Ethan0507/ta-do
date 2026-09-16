@@ -62,7 +62,26 @@ export function DailyList({
                 onOpen={() => onOpenEntry(entry)}
               />
             ))}
-            {entries.length === 0 && <p className="py-4 text-center text-sm text-[var(--color-text-muted)]">Nothing here for today.</p>}
+            {entries.length === 0 && (
+              <div className="flex flex-col items-center gap-1.5 py-10 text-center">
+                <p className="text-sm font-bold text-[var(--color-text)]">Today's clear.</p>
+                <p className="text-[13px] text-[var(--color-text-muted)]">Capture a thought before it slips —</p>
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--color-primary)"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mt-1 rotate-90"
+                  aria-hidden="true"
+                >
+                  <path d="M7 17L17 7M17 7H9M17 7V15" />
+                </svg>
+              </div>
+            )}
           </div>
         </SortableContext>
       </DndContext>

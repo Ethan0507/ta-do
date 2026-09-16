@@ -35,6 +35,7 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
   const [type, setType] = useState<EntryType>(entry.type)
   const [dueDate, setDueDate] = useState(entry.due_date ?? '')
   const [localCategoryIds, setLocalCategoryIds] = useState<string[]>(categoryIds)
+  const [detailsOpen, setDetailsOpen] = useState(Boolean(entry.notes) || categoryIds.length > 0)
   const [isDone, setIsDone] = useState(
     entry.type === 'task' ? entry.task_status === 'done' : entry.type === 'goal' ? entry.goal_status === 'achieved' : false,
   )
@@ -78,6 +79,7 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
   }
 
   async function handleArchiveToggle() {
+    if (!entry.archived_at && !confirm('Archive this entry?')) return
     await setArchived(entry.id, !entry.archived_at)
     onChanged()
     onClose()
@@ -133,26 +135,51 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
           </button>
         )}
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold text-[var(--color-text-muted)]">Notes</span>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={3}
-            placeholder="Add notes…"
-            className="w-full resize-none rounded-2xl border border-[var(--glass-border)] bg-white/45 px-[18px] py-3.5 text-[14px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
-          />
-        </label>
+        <button
+          type="button"
+          onClick={() => setDetailsOpen((o) => !o)}
+          className="flex items-center justify-between px-0.5 py-1 text-xs font-bold text-[var(--color-text-muted)]"
+        >
+          <span>Add notes &amp; categories</span>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`transition-transform ${detailsOpen ? 'rotate-180' : ''}`}
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold text-[var(--color-text-muted)]">Categories</span>
-          <CategoryPicker
-            allCategories={categories}
-            selectedIds={localCategoryIds}
-            onChange={setLocalCategoryIds}
-            onCreateCategory={(name) => createCategory(userId, name).then(onChanged)}
-          />
-        </div>
+        {detailsOpen && (
+          <>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-[var(--color-text-muted)]">Notes</span>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                placeholder="Add notes…"
+                className="w-full resize-none rounded-2xl border border-[var(--glass-border)] bg-white/45 px-[18px] py-3.5 text-[14px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+              />
+            </label>
+
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-[var(--color-text-muted)]">Categories</span>
+              <CategoryPicker
+                allCategories={categories}
+                selectedIds={localCategoryIds}
+                onChange={setLocalCategoryIds}
+                onCreateCategory={(name) => createCategory(userId, name).then(onChanged)}
+              />
+            </div>
+          </>
+        )}
 
         {isDirty && (
           <div className="flex items-center gap-3 pt-1">
@@ -173,13 +200,11 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={handleArchiveToggle}
-          className="w-fit rounded-full border border-[var(--glass-border)] bg-white/40 px-4 py-2 text-sm font-semibold text-[var(--color-text-muted)]"
-        >
-          {entry.archived_at ? 'Unarchive' : 'Archive'}
-        </button>
+        <div className="mt-1 flex justify-end border-t border-[var(--glass-border)] pt-3">
+          <button type="button" onClick={handleArchiveToggle} className="text-xs font-bold text-[var(--color-text-faint)]">
+            {entry.archived_at ? 'Unarchive' : 'Archive'}
+          </button>
+        </div>
       </div>
     </>
   )

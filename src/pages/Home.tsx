@@ -15,6 +15,7 @@ import {
 } from '../lib/entries'
 import { fetchCategories } from '../lib/categories'
 import { GlassBackdrop } from '../components/GlassBackdrop'
+import { Logomark } from '../components/Logomark'
 import { TypeSelector } from '../components/TypeSelector'
 import { DailyList } from '../components/DailyList'
 import { CaptureFab } from '../components/CaptureFab'
@@ -150,16 +151,5 @@ export function Home({ session, onOpenLibrary }: HomeProps) {
         />
       )}
     </div>
-  )
-}
-
-function Logomark() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 56 56" fill="none">
-      <circle cx="22" cy="25" r="16" fill="oklch(100% 0 0 / 0.55)" />
-      <circle cx="35" cy="19" r="11" fill="oklch(100% 0 0 / 0.4)" />
-      <circle cx="29" cy="35" r="9" fill="oklch(100% 0 0 / 0.3)" />
-      <circle cx="25" cy="27" r="5.5" fill="var(--color-primary)" />
-    </svg>
   )
 }
