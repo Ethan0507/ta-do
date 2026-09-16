@@ -1,20 +1,27 @@
 import { supabase } from './supabase'
 
-export async function fetchCaptureToken(userId: string): Promise<string> {
-  const { data, error } = await supabase.from('profiles').select('capture_token').eq('id', userId).single()
-  if (error) throw error
-  return data.capture_token as string
-}
-
 function randomToken(): string {
   const bytes = new Uint8Array(24)
   crypto.getRandomValues(bytes)
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+async function sha256Hex(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+export async function hasCaptureToken(userId: string): Promise<boolean> {
+  const { data, error } = await supabase.from('profiles').select('capture_token_hash').eq('id', userId).single()
+  if (error) throw error
+  return data.capture_token_hash !== null
+}
+
+/** Generates a fresh token, stores only its hash, and returns the raw value — the only time it's ever visible. */
 export async function regenerateCaptureToken(userId: string): Promise<string> {
   const token = randomToken()
-  const { error } = await supabase.from('profiles').update({ capture_token: token }).eq('id', userId)
+  const hash = await sha256Hex(token)
+  const { error } = await supabase.from('profiles').update({ capture_token_hash: hash }).eq('id', userId)
   if (error) throw error
   return token
 }

@@ -1,10 +1,16 @@
 // iOS Shortcuts capture endpoint.
-// Each user has their own capture_token (profiles.capture_token, see
-// 0005_capture_token.sql), sent as the x-capture-token header, so the same
-// Shortcut can be shared and re-configured per user without exposing which
-// account it writes to.
+// Each user has their own capture token, sent as the x-capture-token header;
+// only its SHA-256 hash is stored (profiles.capture_token_hash, see
+// 0007_hash_capture_token.sql), so the same Shortcut can be shared and
+// re-configured per user without exposing which account it writes to, and a
+// leaked profiles table doesn't hand out usable tokens.
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically by the Supabase runtime.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+async function sha256Hex(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+}
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
@@ -21,7 +27,7 @@ Deno.serve(async (req) => {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('id')
-    .eq('capture_token', token)
+    .eq('capture_token_hash', await sha256Hex(token))
     .single()
 
   if (profileError || !profile) {

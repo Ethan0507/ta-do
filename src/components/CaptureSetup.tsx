@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabaseUrl } from '../lib/supabase'
-import { fetchCaptureToken, regenerateCaptureToken, markOnboarded } from '../lib/profile'
+import { hasCaptureToken, regenerateCaptureToken, markOnboarded } from '../lib/profile'
 import { findRecentEntryByContent } from '../lib/entries'
 
 const TEST_PHRASE = 'I have a thought'
@@ -13,6 +13,7 @@ interface CaptureSetupProps {
 
 export function CaptureSetup({ userId, onClose }: CaptureSetupProps) {
   const [token, setToken] = useState<string | null>(null)
+  const [tokenAlreadySet, setTokenAlreadySet] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [copied, setCopied] = useState<'url' | 'token' | null>(null)
   const [regenerating, setRegenerating] = useState(false)
@@ -20,8 +21,14 @@ export function CaptureSetup({ userId, onClose }: CaptureSetupProps) {
   const openedAtRef = useRef(new Date().toISOString())
 
   useEffect(() => {
-    fetchCaptureToken(userId)
-      .then(setToken)
+    hasCaptureToken(userId)
+      .then(async (has) => {
+        if (has) {
+          setTokenAlreadySet(true)
+        } else {
+          setToken(await regenerateCaptureToken(userId))
+        }
+      })
       .catch((err) => setLoadError(err.message ?? 'Failed to load token'))
   }, [userId])
 
@@ -47,10 +54,11 @@ export function CaptureSetup({ userId, onClose }: CaptureSetupProps) {
   }
 
   async function handleRegenerate() {
-    if (!confirm('Regenerating will break any Shortcut still using the old token. Continue?')) return
+    if (tokenAlreadySet && !confirm('Regenerating will break any Shortcut still using the old token. Continue?')) return
     setRegenerating(true)
     const next = await regenerateCaptureToken(userId)
     setToken(next)
+    setTokenAlreadySet(false)
     setRegenerating(false)
   }
 
@@ -110,15 +118,27 @@ export function CaptureSetup({ userId, onClose }: CaptureSetupProps) {
               header, and replace the placeholder with your token below:
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => token && copy(token, 'token')}
-            disabled={!token}
-            className="ml-[30px] break-all rounded-xl border border-[var(--glass-border)] bg-white/60 px-3.5 py-2.5 text-left text-[13px] text-[var(--color-text)]"
-          >
-            {token ?? (loadError ? 'Unable to load' : 'Loading…')}
-          </button>
-          {copied === 'token' && <span className="ml-[30px] text-xs text-[var(--color-success)]">Copied</span>}
+          {token ? (
+            <>
+              <button
+                type="button"
+                onClick={() => copy(token, 'token')}
+                className="ml-[30px] break-all rounded-xl border border-[var(--glass-border)] bg-white/60 px-3.5 py-2.5 text-left text-[13px] text-[var(--color-text)]"
+              >
+                {token}
+              </button>
+              <span className="ml-[30px] text-xs text-[var(--color-text-muted)]">
+                Copy this now — for your security, it won't be shown again after you leave this screen.
+              </span>
+              {copied === 'token' && <span className="ml-[30px] text-xs text-[var(--color-success)]">Copied</span>}
+            </>
+          ) : tokenAlreadySet ? (
+            <span className="ml-[30px] text-[13px] text-[var(--color-text-muted)]">
+              Already set — if you've lost it, use "Regenerate token" below (this'll require updating your Shortcut).
+            </span>
+          ) : (
+            <span className="ml-[30px] text-[13px] text-[var(--color-text-muted)]">{loadError ? 'Unable to load' : 'Loading…'}</span>
+          )}
           {loadError && <span className="ml-[30px] text-xs text-red-600">{loadError}</span>}
         </div>
 
@@ -166,7 +186,7 @@ export function CaptureSetup({ userId, onClose }: CaptureSetupProps) {
         <button
           type="button"
           onClick={handleRegenerate}
-          disabled={regenerating || !token}
+          disabled={regenerating}
           className="w-fit rounded-full border border-[var(--glass-border)] bg-white/40 px-4 py-2 text-sm font-semibold text-[var(--color-text-muted)] disabled:opacity-50"
         >
           {regenerating ? 'Regenerating…' : 'Regenerate token'}
