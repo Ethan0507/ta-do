@@ -36,7 +36,7 @@ export function CaptureSetup({ userId, onClose, markOnboardingOnClose }: Capture
   }, [testFound])
 
   const functionUrl = `${supabaseUrl}/functions/v1/capture-entry`
-  const shortcutUrl = `${window.location.origin}/brain-dump.shortcut`
+  const shortcutUrl = `${window.location.origin}/${encodeURIComponent('Brain Dump.shortcut')}`
 
   async function copy(value: string, which: 'url' | 'token') {
     await navigator.clipboard.writeText(value)
