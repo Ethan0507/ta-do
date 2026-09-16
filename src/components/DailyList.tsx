@@ -92,7 +92,7 @@ export function DailyList({
                   <button
                     type="button"
                     onClick={onShowUpcoming}
-                    className="mt-4 rounded-full border border-[var(--glass-border)] bg-white/45 px-4 py-2 text-xs font-bold text-[var(--color-text)]"
+                    className="mt-4 text-xs font-bold text-[var(--color-primary)] underline underline-offset-2"
                   >
                     Show upcoming tasks
                   </button>

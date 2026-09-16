@@ -48,8 +48,10 @@ export async function fetchTodayEntries(type: EntryType): Promise<Entry[]> {
   return data as Entry[]
 }
 
-/** Every open task regardless of date, dated ones soonest-first then undated ones newest-first. */
-export async function fetchUpcomingTasks(): Promise<Entry[]> {
+export const UPCOMING_TASKS_PAGE_SIZE = 20
+
+/** One page of open tasks regardless of date, dated ones soonest-first then undated ones newest-first. */
+export async function fetchUpcomingTasks(offset: number, limit: number = UPCOMING_TASKS_PAGE_SIZE): Promise<Entry[]> {
   const { data, error } = await supabase
     .from('entries')
     .select('*')
@@ -58,6 +60,7 @@ export async function fetchUpcomingTasks(): Promise<Entry[]> {
     .is('archived_at', null)
     .order('due_date', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
   if (error) throw error
   return data as Entry[]
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { LeadingActions, SwipeAction, SwipeableListItem, Type } from 'react-swipeable-list'
 import 'react-swipeable-list/dist/styles.css'
 import type { Entry } from '../types'
-import { fetchUpcomingTasks, setTaskStatus } from '../lib/entries'
+import { fetchUpcomingTasks, setTaskStatus, UPCOMING_TASKS_PAGE_SIZE } from '../lib/entries'
 
 interface UpcomingTasksSheetProps {
   onClose: () => void
@@ -10,17 +10,53 @@ interface UpcomingTasksSheetProps {
   onOpenEntry: (entry: Entry) => void
 }
 
+function dateGroupLabel(dueDate: string | null): string {
+  if (!dueDate) return 'No due date'
+  const due = new Date(dueDate + 'T00:00:00')
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((due.getTime() - today.getTime()) / 86400000)
+  if (diffDays < 0) return 'Overdue'
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Tomorrow'
+  return due.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+function groupByDate(tasks: Entry[]): { label: string; items: Entry[] }[] {
+  const groups: { label: string; items: Entry[] }[] = []
+  for (const task of tasks) {
+    const label = dateGroupLabel(task.due_date)
+    const last = groups[groups.length - 1]
+    if (last && last.label === label) last.items.push(task)
+    else groups.push({ label, items: [task] })
+  }
+  return groups
+}
+
 export function UpcomingTasksSheet({ onClose, onChanged, onOpenEntry }: UpcomingTasksSheetProps) {
   const [tasks, setTasks] = useState<Entry[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
   const [expanded, setExpanded] = useState(false)
   const scrolledRef = useRef(false)
 
   useEffect(() => {
-    fetchUpcomingTasks()
-      .then(setTasks)
-      .finally(() => setLoaded(true))
+    fetchUpcomingTasks(0).then((page) => {
+      setTasks(page)
+      setHasMore(page.length === UPCOMING_TASKS_PAGE_SIZE)
+      setLoaded(true)
+    })
   }, [])
+
+  async function loadMore() {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    const page = await fetchUpcomingTasks(tasks.length)
+    setTasks((prev) => [...prev, ...page])
+    setHasMore(page.length === UPCOMING_TASKS_PAGE_SIZE)
+    setLoadingMore(false)
+  }
 
   async function handleCheck(entryId: string) {
     await setTaskStatus(entryId, 'done')
@@ -29,12 +65,17 @@ export function UpcomingTasksSheet({ onClose, onChanged, onOpenEntry }: Upcoming
   }
 
   function handleScroll(e: React.UIEvent<HTMLDivElement>) {
-    if (scrolledRef.current) return
-    if (e.currentTarget.scrollTop > 8) {
+    const el = e.currentTarget
+    if (!scrolledRef.current && el.scrollTop > 8) {
       scrolledRef.current = true
       setExpanded(true)
     }
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) {
+      loadMore()
+    }
   }
+
+  const groups = groupByDate(tasks)
 
   return (
     <div
@@ -70,37 +111,44 @@ export function UpcomingTasksSheet({ onClose, onChanged, onOpenEntry }: Upcoming
         {loaded && tasks.length === 0 && (
           <p className="py-8 text-center text-sm text-[var(--color-text-muted)]">No open tasks.</p>
         )}
-        <div className="flex flex-col gap-3">
-          {tasks.map((task) => (
-            <SwipeableListItem
-              key={task.id}
-              listType={Type.IOS}
-              fullSwipe
-              threshold={0.3}
-              onClick={() => onOpenEntry(task)}
-              leadingActions={
-                <LeadingActions>
-                  <SwipeAction onClick={() => handleCheck(task.id)}>
-                    <div className="flex h-full items-center gap-2 rounded-[20px] bg-[var(--color-success)] pl-5">
-                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary-on)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M8 12.5l2.5 2.5L16 9.5" />
-                      </svg>
-                      <span className="text-[13px] font-bold text-[var(--color-primary-on)]">Done</span>
+        <div className="flex flex-col gap-5">
+          {groups.map((group) => (
+            <div key={group.label} className="flex flex-col gap-0.5">
+              <span className="px-1 pb-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-faint)]">
+                {group.label}
+              </span>
+              <div className="divide-y divide-[var(--glass-border)]">
+                {group.items.map((task) => (
+                  <SwipeableListItem
+                    key={task.id}
+                    listType={Type.IOS}
+                    fullSwipe
+                    threshold={0.3}
+                    onClick={() => onOpenEntry(task)}
+                    leadingActions={
+                      <LeadingActions>
+                        <SwipeAction onClick={() => handleCheck(task.id)}>
+                          <div className="flex h-full items-center gap-2 bg-[var(--color-success)] pl-5">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary-on)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M8 12.5l2.5 2.5L16 9.5" />
+                            </svg>
+                            <span className="text-[12.5px] font-bold text-[var(--color-primary-on)]">Done</span>
+                          </div>
+                        </SwipeAction>
+                      </LeadingActions>
+                    }
+                  >
+                    <div className="flex w-full cursor-pointer items-center gap-3 py-2.5">
+                      <div className="h-[17px] w-[17px] shrink-0 rounded-full border-2 border-[var(--color-tertiary)]" />
+                      <p className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-[var(--color-text)]">{task.content}</p>
                     </div>
-                  </SwipeAction>
-                </LeadingActions>
-              }
-            >
-              <div className="flex w-full cursor-pointer items-center gap-3 rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-fill)] px-4 py-3.5 shadow-[var(--glass-shadow)] backdrop-blur-xl">
-                <div className="h-[21px] w-[21px] shrink-0 rounded-full border-2 border-[var(--color-tertiary)]" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[14.5px] font-semibold text-[var(--color-text)]">{task.content}</p>
-                  <p className="text-[11.5px] text-[var(--color-text-muted)]">{task.due_date ? `Due ${task.due_date}` : 'No due date'}</p>
-                </div>
+                  </SwipeableListItem>
+                ))}
               </div>
-            </SwipeableListItem>
+            </div>
           ))}
         </div>
+        {loadingMore && <p className="py-4 text-center text-xs text-[var(--color-text-muted)]">Loading more…</p>}
       </div>
     </div>
   )
