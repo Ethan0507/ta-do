@@ -48,6 +48,20 @@ export async function fetchTodayEntries(type: EntryType): Promise<Entry[]> {
   return data as Entry[]
 }
 
+/** Every open task regardless of date, dated ones soonest-first then undated ones newest-first. */
+export async function fetchUpcomingTasks(): Promise<Entry[]> {
+  const { data, error } = await supabase
+    .from('entries')
+    .select('*')
+    .eq('type', 'task')
+    .eq('task_status', 'open')
+    .is('archived_at', null)
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data as Entry[]
+}
+
 /** Entries of a given type completed/achieved today, for the collapsed "completed" strip. */
 export async function fetchCompletedToday(type: 'task' | 'goal'): Promise<Entry[]> {
   const { startISO, endISO } = todayRange()

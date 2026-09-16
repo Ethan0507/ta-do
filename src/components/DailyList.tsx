@@ -12,6 +12,13 @@ interface DailyListProps {
   onCheck: (entryId: string) => void
   onReorder: (activeId: string, overId: string) => void
   onOpenEntry: (entry: Entry) => void
+  onShowUpcoming?: () => void
+}
+
+const EMPTY_HINT: Record<EntryType, string> = {
+  thought: "Capture a thought before it slips —",
+  task: 'No tasks due today.',
+  goal: 'No goals in progress.',
 }
 
 export function DailyList({
@@ -23,6 +30,7 @@ export function DailyList({
   onCheck,
   onReorder,
   onOpenEntry,
+  onShowUpcoming,
 }: DailyListProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const checkable = type !== 'thought'
@@ -65,7 +73,7 @@ export function DailyList({
             {entries.length === 0 && (
               <div className="flex flex-col items-center gap-1.5 py-10 text-center">
                 <p className="text-sm font-bold text-[var(--color-text)]">Today's clear.</p>
-                <p className="text-[13px] text-[var(--color-text-muted)]">Capture a thought before it slips —</p>
+                <p className="text-[13px] text-[var(--color-text-muted)]">{EMPTY_HINT[type]}</p>
                 <svg
                   width="20"
                   height="20"
@@ -80,6 +88,15 @@ export function DailyList({
                 >
                   <path d="M7 17L17 7M17 7H9M17 7V15" />
                 </svg>
+                {type === 'task' && onShowUpcoming && (
+                  <button
+                    type="button"
+                    onClick={onShowUpcoming}
+                    className="mt-4 rounded-full border border-[var(--glass-border)] bg-white/45 px-4 py-2 text-xs font-bold text-[var(--color-text)]"
+                  >
+                    Show upcoming tasks
+                  </button>
+                )}
               </div>
             )}
           </div>

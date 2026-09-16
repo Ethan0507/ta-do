@@ -20,6 +20,7 @@ import { TypeSelector } from '../components/TypeSelector'
 import { DailyList } from '../components/DailyList'
 import { CaptureFab } from '../components/CaptureFab'
 import { EntryDetail } from '../components/EntryDetail'
+import { UpcomingTasksSheet } from '../components/UpcomingTasksSheet'
 
 interface HomeProps {
   session: Session
@@ -40,6 +41,7 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
   const [categories, setCategories] = useState<Category[]>([])
   const [entryCategoryIds, setEntryCategoryIds] = useState<Record<string, string[]>>({})
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
+  const [showUpcoming, setShowUpcoming] = useState(false)
 
   const reload = useCallback(async () => {
     const [todayEntries, categoryRows, categoryMap] = await Promise.all([
@@ -162,11 +164,16 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
             onCheck={handleCheck}
             onReorder={handleReorder}
             onOpenEntry={setSelectedEntry}
+            onShowUpcoming={() => setShowUpcoming(true)}
           />
         </div>
       </div>
 
       <CaptureFab type={type} onCapture={handleCapture} />
+
+      {showUpcoming && (
+        <UpcomingTasksSheet onClose={() => setShowUpcoming(false)} onChanged={reload} onOpenEntry={setSelectedEntry} />
+      )}
 
       {selectedEntry && (
         <EntryDetail
