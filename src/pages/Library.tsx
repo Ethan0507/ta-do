@@ -5,6 +5,7 @@ import { fetchEntries, fetchEntryCategoryIds } from '../lib/entries'
 import { fetchCategories } from '../lib/categories'
 import { GlassBackdrop } from '../components/GlassBackdrop'
 import { EntryDetail } from '../components/EntryDetail'
+import { CaptureSetup } from '../components/CaptureSetup'
 
 interface LibraryProps {
   session: Session
@@ -30,6 +31,7 @@ export function Library({ session, onBack }: LibraryProps) {
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
   const [typeMenuOpen, setTypeMenuOpen] = useState(false)
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
+  const [captureSetupOpen, setCaptureSetupOpen] = useState(false)
 
   const reload = useCallback(async () => {
     const [entryRows, categoryRows, categoryMap] = await Promise.all([
@@ -109,6 +111,11 @@ export function Library({ session, onBack }: LibraryProps) {
             <IconButton label="Calendar view (coming soon)">
               <path d="M4 6h16M7 12h10M10 18h4" />
             </IconButton>
+            <button type="button" className="contents" onClick={() => setCaptureSetupOpen(true)}>
+              <IconButton label="Shortcuts capture setup">
+                <path d="M13 3L4 14h7l-1 7 9-11h-7l1-7z" />
+              </IconButton>
+            </button>
           </div>
         </div>
 
@@ -255,6 +262,8 @@ export function Library({ session, onBack }: LibraryProps) {
           onChanged={reload}
         />
       )}
+
+      {captureSetupOpen && <CaptureSetup userId={session.user.id} onClose={() => setCaptureSetupOpen(false)} />}
     </div>
   )
 }

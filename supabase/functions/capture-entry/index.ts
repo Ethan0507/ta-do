@@ -1,5 +1,8 @@
 // iOS Shortcuts capture endpoint.
-// Required secrets (set via `supabase secrets set`): SHORTCUT_SECRET, SHORTCUT_USER_ID.
+// Each user has their own capture_token (profiles.capture_token, see
+// 0005_capture_token.sql), sent as the x-capture-token header, so the same
+// Shortcut can be shared and re-configured per user without exposing which
+// account it writes to.
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically by the Supabase runtime.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -8,8 +11,20 @@ Deno.serve(async (req) => {
     return new Response('Method not allowed', { status: 405 })
   }
 
-  const secret = req.headers.get('x-shortcut-secret')
-  if (!secret || secret !== Deno.env.get('SHORTCUT_SECRET')) {
+  const token = req.headers.get('x-capture-token')
+  if (!token) {
+    return new Response('Unauthorized', { status: 401 })
+  }
+
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('capture_token', token)
+    .single()
+
+  if (profileError || !profile) {
     return new Response('Unauthorized', { status: 401 })
   }
 
@@ -24,12 +39,10 @@ Deno.serve(async (req) => {
 
   const type = body?.type === 'goal' || body?.type === 'task' ? body.type : 'thought'
 
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-
   const { data, error } = await supabase
     .from('entries')
     .insert({
-      user_id: Deno.env.get('SHORTCUT_USER_ID'),
+      user_id: profile.id,
       type,
       content,
       task_status: type === 'task' ? 'open' : null,
