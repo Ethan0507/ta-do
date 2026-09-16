@@ -88,7 +88,7 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
   return (
     <>
       <div className="fixed inset-0 z-30 bg-black/30 backdrop-blur-[1px]" onClick={onClose} />
-      <div className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-h-[85vh] max-w-md flex-col gap-4 overflow-y-auto rounded-t-[28px] border-t border-[var(--glass-border)] bg-[var(--glass-fill-strong)] px-5 pb-8 pt-3.5 shadow-[0_-12px_34px_oklch(30%_0.05_285_/_0.2)] backdrop-blur-3xl">
+      <div className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-h-[85dvh] max-w-md flex-col gap-4 overflow-y-auto rounded-t-[28px] border-t border-[var(--glass-border)] bg-[var(--glass-fill-strong)] px-5 pb-8 pt-3.5 shadow-[0_-12px_34px_oklch(30%_0.05_285_/_0.2)] backdrop-blur-3xl">
         <div className="relative flex items-center justify-center">
           <div className="h-1 w-9 rounded-full bg-black/20" />
           <button

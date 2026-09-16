@@ -80,7 +80,7 @@ export function UpcomingTasksSheet({ onClose, onChanged, onOpenEntry }: Upcoming
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-md flex-col border-t border-[var(--glass-border)] bg-[var(--glass-fill-strong)] shadow-[0_-12px_34px_oklch(30%_0.05_285_/_0.2)] backdrop-blur-3xl transition-[height] duration-300 ease-out"
-      style={{ height: expanded ? '100vh' : '48vh', borderTopLeftRadius: expanded ? 0 : 28, borderTopRightRadius: expanded ? 0 : 28 }}
+      style={{ height: expanded ? '100dvh' : '48dvh', borderTopLeftRadius: expanded ? 0 : 28, borderTopRightRadius: expanded ? 0 : 28 }}
     >
       <button
         type="button"
