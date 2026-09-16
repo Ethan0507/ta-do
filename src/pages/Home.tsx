@@ -20,7 +20,7 @@ import { TypeSelector } from '../components/TypeSelector'
 import { DailyList } from '../components/DailyList'
 import { CaptureFab } from '../components/CaptureFab'
 import { EntryDetail } from '../components/EntryDetail'
-import { UpcomingTasksList } from '../components/UpcomingTasksList'
+import { UpcomingTasksSheet } from '../components/UpcomingTasksSheet'
 
 interface HomeProps {
   session: Session
@@ -151,35 +151,29 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
         </div>
 
         <div className="px-5 pt-3.5">
-          <TypeSelector
-            value={type}
-            onChange={(next) => {
-              setType(next)
-              setShowUpcoming(false)
-            }}
-          />
+          <TypeSelector value={type} onChange={setType} />
         </div>
 
         <div className="mt-4">
-          {type === 'task' && showUpcoming ? (
-            <UpcomingTasksList onBack={() => setShowUpcoming(false)} onChanged={reload} onOpenEntry={setSelectedEntry} />
-          ) : (
-            <DailyList
-              entries={entries}
-              completedEntries={completedEntries}
-              type={type}
-              showCompleted={showCompleted}
-              onToggleCompleted={() => setShowCompleted((s) => !s)}
-              onCheck={handleCheck}
-              onReorder={handleReorder}
-              onOpenEntry={setSelectedEntry}
-              onShowUpcoming={() => setShowUpcoming(true)}
-            />
-          )}
+          <DailyList
+            entries={entries}
+            completedEntries={completedEntries}
+            type={type}
+            showCompleted={showCompleted}
+            onToggleCompleted={() => setShowCompleted((s) => !s)}
+            onCheck={handleCheck}
+            onReorder={handleReorder}
+            onOpenEntry={setSelectedEntry}
+            onShowUpcoming={() => setShowUpcoming(true)}
+          />
         </div>
       </div>
 
       <CaptureFab type={type} onCapture={handleCapture} />
+
+      {showUpcoming && (
+        <UpcomingTasksSheet onClose={() => setShowUpcoming(false)} onChanged={reload} onOpenEntry={setSelectedEntry} />
+      )}
 
       {selectedEntry && (
         <EntryDetail
