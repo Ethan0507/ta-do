@@ -30,9 +30,7 @@ function App() {
       ) : (
         <Library session={session} onBack={() => setScreen('home')} />
       )}
-      {showOnboarding && (
-        <CaptureSetup userId={session.user.id} onClose={() => setShowOnboarding(false)} markOnboardingOnClose />
-      )}
+      {showOnboarding && <CaptureSetup userId={session.user.id} onClose={() => setShowOnboarding(false)} />}
     </>
   )
 }

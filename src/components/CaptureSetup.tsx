@@ -3,16 +3,15 @@ import { supabaseUrl } from '../lib/supabase'
 import { fetchCaptureToken, regenerateCaptureToken, markOnboarded } from '../lib/profile'
 import { findRecentEntryByContent } from '../lib/entries'
 
-const TEST_PHRASE = "Let's brain dump!"
+const TEST_PHRASE = 'I have a thought'
 const POLL_MS = 3000
 
 interface CaptureSetupProps {
   userId: string
   onClose: () => void
-  markOnboardingOnClose?: boolean
 }
 
-export function CaptureSetup({ userId, onClose, markOnboardingOnClose }: CaptureSetupProps) {
+export function CaptureSetup({ userId, onClose }: CaptureSetupProps) {
   const [token, setToken] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [copied, setCopied] = useState<'url' | 'token' | null>(null)
@@ -30,10 +29,13 @@ export function CaptureSetup({ userId, onClose, markOnboardingOnClose }: Capture
     if (testFound) return
     const interval = setInterval(async () => {
       const found = await findRecentEntryByContent(TEST_PHRASE, openedAtRef.current).catch(() => null)
-      if (found) setTestFound(true)
+      if (found) {
+        setTestFound(true)
+        markOnboarded(userId).catch(() => {})
+      }
     }, POLL_MS)
     return () => clearInterval(interval)
-  }, [testFound])
+  }, [testFound, userId])
 
   const functionUrl = `${supabaseUrl}/functions/v1/capture-entry`
   const shortcutUrl = `${window.location.origin}/${encodeURIComponent('Brain Dump.shortcut')}`
@@ -53,7 +55,11 @@ export function CaptureSetup({ userId, onClose, markOnboardingOnClose }: Capture
   }
 
   function handleClose() {
-    if (markOnboardingOnClose) markOnboarded(userId).catch(() => {})
+    onClose()
+  }
+
+  async function handleMarkComplete() {
+    await markOnboarded(userId)
     onClose()
   }
 
@@ -120,8 +126,7 @@ export function CaptureSetup({ userId, onClose, markOnboardingOnClose }: Capture
           <div className="flex items-start gap-2.5">
             <StepBadge n={3} />
             <p className="text-[13px] text-[var(--color-text)]">
-              Run the Shortcut (or say "Hey Siri, brain dump") and say exactly:{' '}
-              <strong>&ldquo;{TEST_PHRASE}&rdquo;</strong>
+              Try: <strong>&ldquo;Hey Siri, Brain dump, {TEST_PHRASE}&rdquo;</strong> to test your capture.
             </p>
           </div>
           <div
@@ -165,6 +170,14 @@ export function CaptureSetup({ userId, onClose, markOnboardingOnClose }: Capture
           className="w-fit rounded-full border border-[var(--glass-border)] bg-white/40 px-4 py-2 text-sm font-semibold text-[var(--color-text-muted)] disabled:opacity-50"
         >
           {regenerating ? 'Regenerating…' : 'Regenerate token'}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleMarkComplete}
+          className="w-full rounded-full bg-[var(--color-primary)] py-2.5 text-sm font-bold text-[var(--color-primary-on)]"
+        >
+          {testFound ? 'Done' : 'Mark onboarding complete'}
         </button>
       </div>
     </>
