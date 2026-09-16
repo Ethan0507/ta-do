@@ -56,8 +56,9 @@ export function useTheme(userId: string | undefined) {
   )
 
   const toggle = useCallback(() => {
-    setPreference(resolvedTheme === 'dark' ? 'light' : 'dark')
-  }, [resolvedTheme, setPreference])
+    const next: Record<ThemePreference, ThemePreference> = { light: 'dark', dark: 'auto', auto: 'light' }
+    setPreference(next[preference])
+  }, [preference, setPreference])
 
   return { preference, resolvedTheme, setPreference, toggle }
 }

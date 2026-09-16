@@ -20,7 +20,6 @@ import { TypeSelector } from '../components/TypeSelector'
 import { DailyList } from '../components/DailyList'
 import { CaptureFab } from '../components/CaptureFab'
 import { EntryDetail } from '../components/EntryDetail'
-import { Settings } from '../components/Settings'
 
 interface HomeProps {
   session: Session
@@ -41,7 +40,6 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
   const [categories, setCategories] = useState<Category[]>([])
   const [entryCategoryIds, setEntryCategoryIds] = useState<Record<string, string[]>>({})
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const reload = useCallback(async () => {
     const [todayEntries, categoryRows, categoryMap] = await Promise.all([
@@ -106,29 +104,23 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
               type="button"
               onClick={theme.toggle}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--glass-fill)] backdrop-blur-xl"
-              aria-label={theme.resolvedTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              aria-label={`Theme: ${theme.preference}`}
             >
-              {theme.resolvedTheme === 'dark' ? (
+              {theme.preference === 'dark' ? (
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="4.5" />
                   <path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
                 </svg>
-              ) : (
+              ) : theme.preference === 'light' ? (
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" />
                 </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="8.5" />
+                  <path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="var(--color-text)" stroke="none" />
+                </svg>
               )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--glass-fill)] backdrop-blur-xl"
-              aria-label="Settings"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
             </button>
             <button
               type="button"
@@ -185,10 +177,6 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
           onClose={() => setSelectedEntry(null)}
           onChanged={reload}
         />
-      )}
-
-      {settingsOpen && (
-        <Settings preference={theme.preference} onChange={theme.setPreference} onClose={() => setSettingsOpen(false)} />
       )}
     </div>
   )
