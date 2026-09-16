@@ -25,7 +25,12 @@ import { Settings } from '../components/Settings'
 interface HomeProps {
   session: Session
   onOpenLibrary: () => void
-  theme: { preference: ThemePreference; setPreference: (preference: ThemePreference) => void }
+  theme: {
+    preference: ThemePreference
+    resolvedTheme: 'light' | 'dark'
+    setPreference: (preference: ThemePreference) => void
+    toggle: () => void
+  }
 }
 
 export function Home({ session, onOpenLibrary, theme }: HomeProps) {
@@ -97,6 +102,23 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={theme.toggle}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--glass-fill)] backdrop-blur-xl"
+              aria-label={theme.resolvedTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            >
+              {theme.resolvedTheme === 'dark' ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="4.5" />
+                  <path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" />
+                </svg>
+              )}
+            </button>
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}

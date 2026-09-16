@@ -8,24 +8,30 @@ function systemPrefersDark(): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
+function resolve(preference: ThemePreference): 'light' | 'dark' {
+  return preference === 'dark' || (preference === 'auto' && systemPrefersDark()) ? 'dark' : 'light'
+}
+
 function applyTheme(preference: ThemePreference) {
-  const dark = preference === 'dark' || (preference === 'auto' && systemPrefersDark())
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+  const resolved = resolve(preference)
+  document.documentElement.dataset.theme = resolved
+  return resolved
 }
 
 export function useTheme(userId: string | undefined) {
   const [preference, setPreferenceState] = useState<ThemePreference>(
     () => (localStorage.getItem(STORAGE_KEY) as ThemePreference | null) ?? 'auto',
   )
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() => resolve(preference))
 
   useEffect(() => {
-    applyTheme(preference)
+    setResolvedTheme(applyTheme(preference))
   }, [preference])
 
   useEffect(() => {
     if (preference !== 'auto') return
     const mql = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => applyTheme('auto')
+    const onChange = () => setResolvedTheme(applyTheme('auto'))
     mql.addEventListener('change', onChange)
     return () => mql.removeEventListener('change', onChange)
   }, [preference])
@@ -49,5 +55,9 @@ export function useTheme(userId: string | undefined) {
     [userId],
   )
 
-  return { preference, setPreference }
+  const toggle = useCallback(() => {
+    setPreference(resolvedTheme === 'dark' ? 'light' : 'dark')
+  }, [resolvedTheme, setPreference])
+
+  return { preference, resolvedTheme, setPreference, toggle }
 }
