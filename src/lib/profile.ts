@@ -18,3 +18,14 @@ export async function regenerateCaptureToken(userId: string): Promise<string> {
   if (error) throw error
   return token
 }
+
+export async function fetchOnboardedAt(userId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('profiles').select('onboarded_at').eq('id', userId).single()
+  if (error) throw error
+  return data.onboarded_at as string | null
+}
+
+export async function markOnboarded(userId: string): Promise<void> {
+  const { error } = await supabase.from('profiles').update({ onboarded_at: new Date().toISOString() }).eq('id', userId)
+  if (error) throw error
+}

@@ -1,17 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabaseUrl } from '../lib/supabase'
-import { fetchCaptureToken, regenerateCaptureToken } from '../lib/profile'
+import { fetchCaptureToken, regenerateCaptureToken, markOnboarded } from '../lib/profile'
+import { findRecentEntryByContent } from '../lib/entries'
+
+const TEST_PHRASE = "Let's brain dump!"
+const POLL_MS = 3000
 
 interface CaptureSetupProps {
   userId: string
   onClose: () => void
+  markOnboardingOnClose?: boolean
 }
 
-export function CaptureSetup({ userId, onClose }: CaptureSetupProps) {
+export function CaptureSetup({ userId, onClose, markOnboardingOnClose }: CaptureSetupProps) {
   const [token, setToken] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [copied, setCopied] = useState<'url' | 'token' | null>(null)
   const [regenerating, setRegenerating] = useState(false)
+  const [testFound, setTestFound] = useState(false)
+  const openedAtRef = useRef(new Date().toISOString())
 
   useEffect(() => {
     fetchCaptureToken(userId)
@@ -19,7 +26,17 @@ export function CaptureSetup({ userId, onClose }: CaptureSetupProps) {
       .catch((err) => setLoadError(err.message ?? 'Failed to load token'))
   }, [userId])
 
+  useEffect(() => {
+    if (testFound) return
+    const interval = setInterval(async () => {
+      const found = await findRecentEntryByContent(TEST_PHRASE, openedAtRef.current).catch(() => null)
+      if (found) setTestFound(true)
+    }, POLL_MS)
+    return () => clearInterval(interval)
+  }, [testFound])
+
   const functionUrl = `${supabaseUrl}/functions/v1/capture-entry`
+  const shortcutUrl = `${window.location.origin}/brain-dump.shortcut`
 
   async function copy(value: string, which: 'url' | 'token') {
     await navigator.clipboard.writeText(value)
@@ -35,15 +52,20 @@ export function CaptureSetup({ userId, onClose }: CaptureSetupProps) {
     setRegenerating(false)
   }
 
+  function handleClose() {
+    if (markOnboardingOnClose) markOnboarded(userId).catch(() => {})
+    onClose()
+  }
+
   return (
     <>
-      <div className="fixed inset-0 z-30 bg-black/30 backdrop-blur-[1px]" onClick={onClose} />
+      <div className="fixed inset-0 z-30 bg-black/30 backdrop-blur-[1px]" onClick={handleClose} />
       <div className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-h-[85vh] max-w-md flex-col gap-4 overflow-y-auto rounded-t-[28px] border-t border-[var(--glass-border)] bg-[var(--glass-fill-strong)] px-5 pb-8 pt-3.5 shadow-[0_-12px_34px_oklch(30%_0.05_285_/_0.2)] backdrop-blur-3xl">
         <div className="relative flex items-center justify-center">
           <div className="h-1 w-9 rounded-full bg-black/20" />
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="absolute right-0 -top-1 flex h-[30px] w-[30px] items-center justify-center rounded-full bg-white/50"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="2.2" strokeLinecap="round">
@@ -53,40 +75,88 @@ export function CaptureSetup({ userId, onClose }: CaptureSetupProps) {
         </div>
 
         <div>
-          <h2 className="text-lg font-bold text-[var(--color-text)]">Shortcuts capture</h2>
+          <h2 className="text-lg font-bold text-[var(--color-text)]">Set up voice capture</h2>
           <p className="mt-1 text-[13px] text-[var(--color-text-muted)]">
-            Point your iOS Shortcut's "Get Contents of URL" action at this URL, with your token in the{' '}
-            <code className="rounded bg-black/10 px-1">x-capture-token</code> header. If you share the Shortcut with
-            someone else, they'll swap in their own token from this screen — entries always land in the account the
-            token belongs to.
+            Say "Hey Siri, brain dump" anywhere and it lands in your Today list. Three steps to set it up.
           </p>
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold text-[var(--color-text-muted)]">Function URL</span>
-          <button
-            type="button"
-            onClick={() => copy(functionUrl, 'url')}
-            className="break-all rounded-xl border border-[var(--glass-border)] bg-white/45 px-3.5 py-2.5 text-left text-[13px] text-[var(--color-text)]"
+        <div className="flex flex-col gap-2 rounded-2xl border border-[var(--glass-border)] bg-white/45 p-3.5">
+          <div className="flex items-start gap-2.5">
+            <StepBadge n={1} />
+            <p className="text-[13px] text-[var(--color-text)]">
+              On your iPhone, open this link and tap <strong>Add Shortcut</strong>:
+            </p>
+          </div>
+          <a
+            href={shortcutUrl}
+            className="ml-[30px] break-all rounded-xl border border-[var(--color-primary)] bg-white/60 px-3.5 py-2.5 text-[13px] font-semibold text-[var(--color-primary)]"
           >
-            {functionUrl}
-          </button>
-          {copied === 'url' && <span className="text-xs text-[var(--color-success)]">Copied</span>}
+            {shortcutUrl}
+          </a>
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold text-[var(--color-text-muted)]">Your capture token</span>
+        <div className="flex flex-col gap-2 rounded-2xl border border-[var(--glass-border)] bg-white/45 p-3.5">
+          <div className="flex items-start gap-2.5">
+            <StepBadge n={2} />
+            <p className="text-[13px] text-[var(--color-text)]">
+              Open the imported Shortcut, find the <code className="rounded bg-black/10 px-1">x-capture-token</code>{' '}
+              header, and replace the placeholder with your token below:
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => token && copy(token, 'token')}
             disabled={!token}
-            className="break-all rounded-xl border border-[var(--glass-border)] bg-white/45 px-3.5 py-2.5 text-left text-[13px] text-[var(--color-text)]"
+            className="ml-[30px] break-all rounded-xl border border-[var(--glass-border)] bg-white/60 px-3.5 py-2.5 text-left text-[13px] text-[var(--color-text)]"
           >
             {token ?? (loadError ? 'Unable to load' : 'Loading…')}
           </button>
-          {copied === 'token' && <span className="text-xs text-[var(--color-success)]">Copied</span>}
-          {loadError && <span className="text-xs text-red-600">{loadError}</span>}
+          {copied === 'token' && <span className="ml-[30px] text-xs text-[var(--color-success)]">Copied</span>}
+          {loadError && <span className="ml-[30px] text-xs text-red-600">{loadError}</span>}
         </div>
+
+        <div className="flex flex-col gap-2 rounded-2xl border border-[var(--glass-border)] bg-white/45 p-3.5">
+          <div className="flex items-start gap-2.5">
+            <StepBadge n={3} />
+            <p className="text-[13px] text-[var(--color-text)]">
+              Run the Shortcut (or say "Hey Siri, brain dump") and say exactly:{' '}
+              <strong>&ldquo;{TEST_PHRASE}&rdquo;</strong>
+            </p>
+          </div>
+          <div
+            className={`ml-[30px] flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[13px] font-semibold ${
+              testFound ? 'bg-[var(--color-success)]/20 text-[var(--color-success)]' : 'bg-white/60 text-[var(--color-text-muted)]'
+            }`}
+          >
+            {testFound ? (
+              <>✓ Got it — your Shortcut is working!</>
+            ) : (
+              <>
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" /> Waiting for your test thought…
+              </>
+            )}
+          </div>
+        </div>
+
+        <details className="text-[13px] text-[var(--color-text-muted)]">
+          <summary className="cursor-pointer font-semibold">Building it by hand instead?</summary>
+          <div className="mt-2 flex flex-col gap-2">
+            <p>
+              Add a <strong>Dictate Text</strong> action, then a <strong>Get Contents of URL</strong> action: Method{' '}
+              <strong>POST</strong>, URL below, a JSON body with key <code className="rounded bg-black/10 px-1">content</code>{' '}
+              set to the dictated text, and the token header from step 2 above.
+            </p>
+            <button
+              type="button"
+              onClick={() => copy(functionUrl, 'url')}
+              className="break-all rounded-xl border border-[var(--glass-border)] bg-white/45 px-3.5 py-2.5 text-left text-[13px] text-[var(--color-text)]"
+            >
+              {functionUrl}
+            </button>
+            {copied === 'url' && <span className="text-xs text-[var(--color-success)]">Copied</span>}
+          </div>
+        </details>
 
         <button
           type="button"
@@ -98,5 +168,13 @@ export function CaptureSetup({ userId, onClose }: CaptureSetupProps) {
         </button>
       </div>
     </>
+  )
+}
+
+function StepBadge({ n }: { n: number }) {
+  return (
+    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-[11px] font-bold text-[var(--color-primary-on)]">
+      {n}
+    </span>
   )
 }

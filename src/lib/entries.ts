@@ -165,6 +165,19 @@ export async function updateEntryDueDate(entryId: string, dueDate: string | null
   if (error) throw error
 }
 
+export async function findRecentEntryByContent(content: string, sinceISO: string): Promise<Entry | null> {
+  const { data, error } = await supabase
+    .from('entries')
+    .select('*')
+    .eq('content', content)
+    .gte('created_at', sinceISO)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data as Entry | null
+}
+
 export async function fetchEntryCategoryIds(): Promise<Record<string, string[]>> {
   const { data, error } = await supabase.from('entry_categories').select('entry_id, category_id')
   if (error) throw error
