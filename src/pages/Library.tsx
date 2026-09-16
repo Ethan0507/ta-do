@@ -83,7 +83,7 @@ export function Library({ session, onBack }: LibraryProps) {
   }, [filtered, sortMode, entryCategoryIds, categories])
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[var(--app-bg)]">
+    <div className="app-shell relative min-h-screen overflow-hidden">
       <GlassBackdrop />
 
       <div className="relative mx-auto flex max-w-md flex-col pb-16">
@@ -98,19 +98,22 @@ export function Library({ session, onBack }: LibraryProps) {
               Library
             </span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <IconButton active label="List view">
-              <path d="M4 6h16M4 12h16M4 18h16" />
-            </IconButton>
-            <IconButton label="Grid view (coming soon)">
-              <rect x="3" y="3" width="7" height="7" rx="1.5" />
-              <rect x="14" y="3" width="7" height="7" rx="1.5" />
-              <rect x="3" y="14" width="7" height="7" rx="1.5" />
-              <rect x="14" y="14" width="7" height="7" rx="1.5" />
-            </IconButton>
-            <IconButton label="Calendar view (coming soon)">
-              <path d="M4 6h16M7 12h10M10 18h4" />
-            </IconButton>
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5">
+              <IconButton active label="List view">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </IconButton>
+              <IconButton label="Grid view (coming soon)">
+                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5" />
+              </IconButton>
+              <IconButton label="Calendar view (coming soon)">
+                <path d="M4 6h16M7 12h10M10 18h4" />
+              </IconButton>
+            </div>
+            <div className="h-5 w-px bg-[var(--glass-border)]" />
             <button type="button" className="contents" onClick={() => setCaptureSetupOpen(true)}>
               <IconButton label="Shortcuts capture setup">
                 <path d="M13 3L4 14h7l-1 7 9-11h-7l1-7z" />

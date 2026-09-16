@@ -82,7 +82,7 @@ export function Home({ session, onOpenLibrary }: HomeProps) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[var(--app-bg)]">
+    <div className="app-shell relative min-h-screen overflow-hidden">
       <GlassBackdrop />
 
       <div className="relative mx-auto flex max-w-md flex-col pb-28">

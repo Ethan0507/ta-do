@@ -35,7 +35,7 @@ export function Login() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--app-bg)] px-5">
+    <div className="app-shell relative flex min-h-screen items-center justify-center overflow-hidden px-5">
       <GlassBackdrop />
 
       <div className="relative w-full max-w-sm rounded-[28px] border border-[var(--glass-border)] bg-[var(--glass-fill-strong)] p-7 shadow-[var(--glass-shadow)] backdrop-blur-3xl">

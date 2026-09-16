@@ -22,11 +22,57 @@
   --glass-shadow: 0 8px 30px oklch(25% 0.05 285 / 0.22), inset 0 1px 0 oklch(100% 0 0 / 0.5);
 
   --app-bg: oklch(90% 0.02 285);
+  --app-bg-image: none;
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-text: oklch(95% 0.01 285);
+    --color-text-muted: oklch(85% 0.015 285 / 0.65);
+    --color-text-faint: oklch(85% 0.015 285 / 0.48);
+
+    --glass-fill: oklch(32% 0.03 285 / 0.45);
+    --glass-fill-strong: oklch(24% 0.03 285 / 0.78);
+    --glass-border: oklch(100% 0 0 / 0.14);
+    --glass-shadow: 0 8px 30px oklch(0% 0 0 / 0.45), inset 0 1px 0 oklch(100% 0 0 / 0.08);
+
+    --app-bg: oklch(15% 0.02 285);
+    --app-bg-image: radial-gradient(
+      130% 100% at 18% -10%,
+      oklch(27% 0.06 290) 0%,
+      oklch(17% 0.03 286) 45%,
+      oklch(11% 0.015 280) 100%
+    );
+  }
 }
 
 body {
   font-family: var(--font-body);
   color: var(--color-text);
+  background: var(--app-bg);
+}
+
+.app-shell {
+  background-color: var(--app-bg);
+  background-image: var(--app-bg-image);
+}
+
+/* Nested "frosted" surfaces (fields, chips, drag handles, scrims) are authored as
+   literal white/black-opacity utilities for the light glass look. Recalibrate them
+   for dark mode instead of letting raw white at 40-60% opacity wash out into a flat
+   gray card — everything here keeps its *role* (highlight vs. scrim) but at the
+   intensity that actually reads as glass against a dark surface. */
+@media (prefers-color-scheme: dark) {
+  .bg-white\/40 { background-color: oklch(100% 0 0 / 0.06); }
+  .bg-white\/45 { background-color: oklch(100% 0 0 / 0.08); }
+  .bg-white\/50 { background-color: oklch(100% 0 0 / 0.1); }
+  .bg-white\/60 { background-color: oklch(100% 0 0 / 0.14); }
+  .hover\:bg-white\/50:hover { background-color: oklch(100% 0 0 / 0.1); }
+  .bg-black\/10 { background-color: oklch(100% 0 0 / 0.12); }
+  .bg-black\/20 { background-color: oklch(100% 0 0 / 0.18); }
+  .bg-black\/30 { background-color: oklch(0% 0 0 / 0.5); }
 }
 
 /* react-swipeable-list base overrides to match the glass rows */
