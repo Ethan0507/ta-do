@@ -1,7 +1,7 @@
-# Ta-do — Schema (Draft v0.2)
+# Ta-do — Schema (Draft v0.3)
 
-Status: core entities resolved; Habit/Routine layer still being finalized; one open question remains (UserSettings fields).
-Last updated: 2026-08-26
+Status: core entities resolved; auth + Shortcuts capture shipped and in production; Habit/Routine layer still being finalized; one open question remains (UserSettings fields).
+Last updated: 2026-09-16
 
 This is the schema after tallying against feature requirements. Backend: **Supabase** (Postgres + Auth + Realtime), same as routein — chosen so multiple users can use the app simultaneously (this is a real multi-user app from day one, not just schema-shaped for it; currently only one person uses it, but concurrent multi-user is a hard requirement, not a nice-to-have).
 
@@ -9,13 +9,17 @@ This is the schema after tallying against feature requirements. Backend: **Supab
 
 ## User
 
+Auth: Supabase Auth, passwordless — email magic link (`signInWithOtp`) as the primary path, Google OAuth as a lower-friction alternative. No passwords stored. (Originally scoped as a typed 6-digit OTP code, but Supabase's default email template only supports a clickable link without custom SMTP configured; switched to magic-link-only rather than take on an SMTP dependency — see notes.md.)
+
 | Field | Type | Notes |
 |---|---|---|
 | id | uuid | Supabase `auth.users` id |
-| email / auth_ref | string | depends on chosen auth approach |
+| email | string | via `auth.users`, not duplicated on `profiles` |
 | created_at | timestamp | |
 | timezone | string | affects what "today" / "this week" means |
 | status | enum | active / deactivated |
+| capture_token_hash | text, nullable, unique | SHA-256 hash of the per-user iOS Shortcuts capture token; raw value is never stored, only shown once client-side at generation time |
+| onboarded_at | timestamp, nullable | set once the user completes (or dismisses) the first-run Shortcuts setup walkthrough |
 
 ## UserSettings
 
@@ -52,6 +56,7 @@ The core object. A brain-dump item; type determines which extra fields apply.
 | user_id | uuid (FK → User) | |
 | type | enum | thought / goal / task — defaults to `thought`, changeable after capture |
 | content | text | the only required field at capture |
+| notes | text, nullable | freeform longer-form notes, separate from the short `content` line; editable from Entry Detail |
 | created_at | timestamp | immutable |
 | archived_at | timestamp, nullable | null = active; set = hidden from lists, still viewable |
 | habit_id | uuid (FK → Habit, nullable) | set if this Entry was generated from a recurring Habit |
@@ -157,6 +162,16 @@ No uniqueness constraint on (user_id, period_type, period_identifier) — a sing
 | reflection_content | text | |
 | created_at | timestamp | |
 
+## iOS Shortcuts capture (Edge Function, not a table)
+
+`supabase/functions/capture-entry` — a Supabase Edge Function, not a Postgres table, but documented here since it's a real integration surface.
+
+- Auth: caller sends `x-capture-token` header; the function hashes it (SHA-256) and looks up `profiles.capture_token_hash` to resolve which user it belongs to, then inserts the Entry as that user via the service-role client (bypassing RLS deliberately, since the request itself isn't a Supabase session).
+- One token per user (not one global secret) — originally shipped as a single hard-coded `SHORTCUT_USER_ID`/`SHORTCUT_SECRET` env-var pair, which meant a shared Shortcut would silently write into the original owner's account; redesigned so each user has their own token and the same Shortcut structure can be shared, with each recipient swapping in their own token.
+- Token is shown to the user exactly once (at generation, in the app's "Set up voice capture" screen) and never re-displayed — only its hash is stored. Losing it means regenerating (and updating the Shortcut).
+- A pre-built, importable `.shortcut` file is hosted at `/Brain Dump.shortcut` (public/ directory) — built once by hand in the Shortcuts app with a placeholder token value, then hosted directly rather than distributed through Apple's iCloud share flow (which would require an Apple ID signed into automation tooling, not available in this environment).
+- Body: `{ content: string, type?: 'thought' | 'goal' | 'task' }` — `type` defaults to `thought` if omitted.
+
 ---
 
 ## Not stored — computed views
@@ -176,6 +191,10 @@ No uniqueness constraint on (user_id, period_type, period_identifier) — a sing
 - Undated/uncategorized Tasks → float in the current daily altitude view by default.
 - Storage/backend → Supabase (Postgres + Auth + Realtime), matching routein.
 - Multi-user, concurrent → confirmed requirement, not just personal-use scaffolding.
+- Auth approach → passwordless: email magic link + Google OAuth, both via Supabase Auth. No passwords stored.
+- Entry `notes` field → added, freeform text separate from `content`, nullable.
+- Shortcuts capture endpoint auth → per-user hashed capture token (see dedicated section above), not a single shared secret.
+- First-run onboarding → `profiles.onboarded_at`, walkthrough shown once, dismissible or auto-completed by a live capture test.
 
 ## Open questions still to resolve
 

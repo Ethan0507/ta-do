@@ -1,6 +1,6 @@
 # Ta-do — Checklist
 
-Last updated: 2026-08-26
+Last updated: 2026-09-16
 
 ## Success Metric (MVP)
 MVP succeeds if Ethan uses Ta-do **daily for 2 consecutive weeks** as his sole capture point for personal thoughts/tasks (replacing iOS Notes) and work-adjacent personal capture (replacing Slack self-DMs/personal chats), with nothing he cared about falling through the cracks during that window. Checked subjectively at the end of the 2 weeks — did anything get lost, did he revert to Notes or Slack even once — not via an in-app analytics event.
@@ -31,14 +31,16 @@ MVP succeeds if Ethan uses Ta-do **daily for 2 consecutive weeks** as his sole c
 - [x] Decide storage/backend → Supabase (Postgres + Auth + Realtime), same as routein
 
 ## MVP Core — build first, minimum to start the 2-week usage trial
-- [ ] Brain dump capture (Thought / Goal / Task)
-- [ ] Archive entry (hide from lists, still viewable)
-- [ ] Library view (all entries, sortable by type/date/deadline/priority)
-- [ ] Category assignment / movement
-- [ ] iOS Shortcuts capture endpoint (needs its own auth token — see Security)
-- [ ] Rollup for Tasks and Goals (Tasks via status/completed_at, Goals via status/achieved_at)
-- [ ] Supabase Auth (login) wired up — MVP-required, not deferred (see note under Security)
-- [ ] RLS policies scoping every table by user_id — MVP-required, not deferred (see note under Security)
+- [x] Brain dump capture (Thought / Goal / Task)
+- [x] Archive entry (hide from lists, still viewable)
+- [x] Library view (all entries, filterable by type, sortable by category or newest — not by deadline/priority)
+- [x] Category assignment / movement
+- [x] iOS Shortcuts capture endpoint (per-user hashed auth token — see Security)
+- [x] Rollup for Tasks and Goals (Tasks via status/completed_at, Goals via status/achieved_at)
+- [x] Supabase Auth (login) wired up — email magic link + Google OAuth
+- [x] RLS policies scoping every table by user_id
+- [x] Notes field on Entry (freeform, separate from `content`)
+- [x] First-run onboarding walkthrough for Shortcuts setup, with live capture test
 
 ## MVP Complete — build after Core, still required to call the MVP done, lower priority
 - [ ] Altitude changer (day default → week/month/year zoom), undated/uncategorized Tasks float in daily view by default
@@ -48,13 +50,13 @@ MVP succeeds if Ethan uses Ta-do **daily for 2 consecutive weeks** as his sole c
 
 ## Multi-User
 - [x] Confirm multi-user, concurrent use is a real requirement (not just personal use)
-- [ ] Supabase Auth wired up for signup/login — **moved to MVP Core**, since Ethan uses real personal data from day one
+- [x] Supabase Auth wired up for signup/login — **moved to MVP Core**, since Ethan uses real personal data from day one
 - [ ] Realtime sync verified for concurrent editing (matching routein's approach) — not MVP-blocking, only matters once a second user actually exists
 
 ## Security — required before broader personal/production use, not blocking MVP dev
 Note: basic Supabase Auth + RLS (data scoped per user_id) are pulled forward into MVP Core above, since Ethan starts using this on real data immediately. Everything below is the remaining hardening pass before relying on it more broadly.
-- [ ] Auth token / API key for the iOS Shortcuts capture endpoint (currently unauthenticated in design)
-- [ ] Secrets/env management (Supabase keys, any service tokens) kept out of client bundle
+- [x] Auth token / API key for the iOS Shortcuts capture endpoint — per-user token, hashed (SHA-256) at rest, never stored or re-displayed in plain text after generation
+- [x] Secrets/env management — Supabase service-role key stays server-side (Edge Function secret only); anon key is public by design, protected by RLS not secrecy
 - [ ] Rate limiting on public-facing capture endpoint
 - [ ] Data export + account deactivation/deletion flow (ties into "Deactivate account / clear data" below)
 - [ ] Dependency/vulnerability scanning before going live for personal use
@@ -69,11 +71,18 @@ Note: basic Supabase Auth + RLS (data scoped per user_id) are pulled forward int
 - [ ] Full Routine visualization (grouping habits by recurrence: daily/weekly/monthly)
 
 ## Standard App Essentials
-- [ ] Login/signup (Supabase Auth)
-- [ ] Data security (see Security section above)
+- [x] Login/signup (Supabase Auth — email magic link + Google OAuth)
+- [x] Data security (see Security section above — RLS + hashed capture tokens; rate limiting and data export/deletion still open)
 - [ ] Cookie handling
 - [ ] User profile
 - [ ] Deactivate account / clear data
+
+## Deployment
+- [x] GitHub repo (github.com/Ethan0507/ta-do)
+- [x] Production hosting on Vercel (ta-do.vercel.app)
+- [x] Supabase project provisioned, migrations applied
+- [x] Supabase Auth redirect URLs configured for both localhost (dev) and the production domain
+- [ ] Custom SMTP provider (currently on Supabase's default sender — fine for personal use, has a low hourly send-rate limit)
 
 ## Open Questions
 - Routine model: one per user or multiple named routines? Pause vs. permanently-done semantics when a habit is removed from the Routine?
