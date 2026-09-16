@@ -24,28 +24,33 @@
   --app-bg: oklch(90% 0.02 285);
   --app-bg-image: none;
 
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-text: oklch(95% 0.01 285);
-    --color-text-muted: oklch(85% 0.015 285 / 0.65);
-    --color-text-faint: oklch(85% 0.015 285 / 0.48);
+/* Theme is resolved in JS (system preference + the user's explicit choice from
+   Settings) into a single data-theme attribute on <html> — see useTheme.ts and
+   the inline script in index.html that sets it before first paint. No
+   prefers-color-scheme media query here; that fallback logic lives in JS so an
+   explicit "Light"/"Dark" choice can override the system setting either way. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
 
-    --glass-fill: oklch(32% 0.03 285 / 0.45);
-    --glass-fill-strong: oklch(24% 0.03 285 / 0.78);
-    --glass-border: oklch(100% 0 0 / 0.14);
-    --glass-shadow: 0 8px 30px oklch(0% 0 0 / 0.45), inset 0 1px 0 oklch(100% 0 0 / 0.08);
+  --color-text: oklch(95% 0.01 285);
+  --color-text-muted: oklch(85% 0.015 285 / 0.65);
+  --color-text-faint: oklch(85% 0.015 285 / 0.48);
 
-    --app-bg: oklch(15% 0.02 285);
-    --app-bg-image: radial-gradient(
-      130% 100% at 18% -10%,
-      oklch(27% 0.06 290) 0%,
-      oklch(17% 0.03 286) 45%,
-      oklch(11% 0.015 280) 100%
-    );
-  }
+  --glass-fill: oklch(32% 0.03 285 / 0.45);
+  --glass-fill-strong: oklch(24% 0.03 285 / 0.78);
+  --glass-border: oklch(100% 0 0 / 0.14);
+  --glass-shadow: 0 8px 30px oklch(0% 0 0 / 0.45), inset 0 1px 0 oklch(100% 0 0 / 0.08);
+
+  --app-bg: oklch(15% 0.02 285);
+  --app-bg-image: radial-gradient(
+    130% 100% at 18% -10%,
+    oklch(27% 0.06 290) 0%,
+    oklch(17% 0.03 286) 45%,
+    oklch(11% 0.015 280) 100%
+  );
 }
 
 body {
@@ -64,16 +69,14 @@ body {
    for dark mode instead of letting raw white at 40-60% opacity wash out into a flat
    gray card — everything here keeps its *role* (highlight vs. scrim) but at the
    intensity that actually reads as glass against a dark surface. */
-@media (prefers-color-scheme: dark) {
-  .bg-white\/40 { background-color: oklch(100% 0 0 / 0.06); }
-  .bg-white\/45 { background-color: oklch(100% 0 0 / 0.08); }
-  .bg-white\/50 { background-color: oklch(100% 0 0 / 0.1); }
-  .bg-white\/60 { background-color: oklch(100% 0 0 / 0.14); }
-  .hover\:bg-white\/50:hover { background-color: oklch(100% 0 0 / 0.1); }
-  .bg-black\/10 { background-color: oklch(100% 0 0 / 0.12); }
-  .bg-black\/20 { background-color: oklch(100% 0 0 / 0.18); }
-  .bg-black\/30 { background-color: oklch(0% 0 0 / 0.5); }
-}
+:root[data-theme='dark'] .bg-white\/40 { background-color: oklch(100% 0 0 / 0.06); }
+:root[data-theme='dark'] .bg-white\/45 { background-color: oklch(100% 0 0 / 0.08); }
+:root[data-theme='dark'] .bg-white\/50 { background-color: oklch(100% 0 0 / 0.1); }
+:root[data-theme='dark'] .bg-white\/60 { background-color: oklch(100% 0 0 / 0.14); }
+:root[data-theme='dark'] .hover\:bg-white\/50:hover { background-color: oklch(100% 0 0 / 0.1); }
+:root[data-theme='dark'] .bg-black\/10 { background-color: oklch(100% 0 0 / 0.12); }
+:root[data-theme='dark'] .bg-black\/20 { background-color: oklch(100% 0 0 / 0.18); }
+:root[data-theme='dark'] .bg-black\/30 { background-color: oklch(0% 0 0 / 0.5); }
 
 /* react-swipeable-list base overrides to match the glass rows */
 .swipeable-list-item__content {

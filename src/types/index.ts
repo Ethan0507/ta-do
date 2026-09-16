@@ -2,6 +2,7 @@ export type EntryType = 'thought' | 'goal' | 'task'
 export type TaskStatus = 'open' | 'done'
 export type GoalStatus = 'ongoing' | 'achieved'
 export type PeriodScope = 'week' | 'month' | 'year'
+export type ThemePreference = 'light' | 'dark' | 'auto'
 
 export interface Category {
   id: string

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import type { Category, Entry, EntryType } from '../types'
+import type { Category, Entry, EntryType, ThemePreference } from '../types'
 import {
   computeReorderedPosition,
   createEntry,
@@ -20,13 +20,15 @@ import { TypeSelector } from '../components/TypeSelector'
 import { DailyList } from '../components/DailyList'
 import { CaptureFab } from '../components/CaptureFab'
 import { EntryDetail } from '../components/EntryDetail'
+import { Settings } from '../components/Settings'
 
 interface HomeProps {
   session: Session
   onOpenLibrary: () => void
+  theme: { preference: ThemePreference; setPreference: (preference: ThemePreference) => void }
 }
 
-export function Home({ session, onOpenLibrary }: HomeProps) {
+export function Home({ session, onOpenLibrary, theme }: HomeProps) {
   const [type, setType] = useState<EntryType>('thought')
   const [entries, setEntries] = useState<Entry[]>([])
   const [completedEntries, setCompletedEntries] = useState<Entry[]>([])
@@ -34,6 +36,7 @@ export function Home({ session, onOpenLibrary }: HomeProps) {
   const [categories, setCategories] = useState<Category[]>([])
   const [entryCategoryIds, setEntryCategoryIds] = useState<Record<string, string[]>>({})
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const reload = useCallback(async () => {
     const [todayEntries, categoryRows, categoryMap] = await Promise.all([
@@ -96,6 +99,17 @@ export function Home({ session, onOpenLibrary }: HomeProps) {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--glass-fill)] backdrop-blur-xl"
+              aria-label="Settings"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+            <button
+              type="button"
               onClick={onOpenLibrary}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--glass-fill)] backdrop-blur-xl"
               aria-label="Open library"
@@ -149,6 +163,10 @@ export function Home({ session, onOpenLibrary }: HomeProps) {
           onClose={() => setSelectedEntry(null)}
           onChanged={reload}
         />
+      )}
+
+      {settingsOpen && (
+        <Settings preference={theme.preference} onChange={theme.setPreference} onClose={() => setSettingsOpen(false)} />
       )}
     </div>
   )
