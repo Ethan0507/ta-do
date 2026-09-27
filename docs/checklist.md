@@ -41,6 +41,7 @@ MVP succeeds if Ethan uses Ta-do **daily for 2 consecutive weeks** as his sole c
 - [x] RLS policies scoping every table by user_id
 - [x] Notes field on Entry (freeform, separate from `content`)
 - [x] First-run onboarding walkthrough for Shortcuts setup, with live capture test
+- [x] Multi-line task capture — pasting/typing several lines into the task capture box opens an editable draft-review sheet (edit/remove/add lines) before creating them all together
 
 ## MVP Complete — build after Core, still required to call the MVP done, lower priority
 - [ ] Altitude changer (day default → week/month/year zoom), undated/uncategorized Tasks float in daily view by default
