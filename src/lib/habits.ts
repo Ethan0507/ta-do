@@ -66,10 +66,28 @@ export async function setEntryRecurrence(
       .single()
     if (error) throw error
     habitId = data.id
-    const { error: linkError } = await supabase.from('entries').update({ habit_id: habitId }).eq('id', entryId)
+
+    // The entry being turned into a repeat is a one-off template from here on, not an
+    // occurrence itself — archive it so only the generator's dated occurrences show up
+    // in daily/upcoming lists (otherwise an undated template and today's generated
+    // occurrence both show at once).
+    const { error: linkError } = await supabase
+      .from('entries')
+      .update({ habit_id: habitId, archived_at: new Date().toISOString() })
+      .eq('id', entryId)
     if (linkError) throw linkError
   }
 
   const { error: upsertError } = await supabase.from('routine_habits').upsert({ routine_id: routineId, habit_id: habitId })
   if (upsertError) throw upsertError
+
+  if (!existingHabitId) {
+    // Best-effort: run the generator immediately so today's occurrence appears right
+    // away instead of waiting for the next scheduled tick (up to 15 minutes).
+    try {
+      await supabase.rpc('generate_habit_entries')
+    } catch {
+      // ignore — the scheduled job will still pick it up within 15 minutes
+    }
+  }
 }
