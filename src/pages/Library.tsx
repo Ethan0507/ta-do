@@ -263,6 +263,7 @@ export function Library({ session, onBack }: LibraryProps) {
           categoryIds={entryCategoryIds[selectedEntry.id] ?? []}
           onClose={() => setSelectedEntry(null)}
           onChanged={reload}
+          onOpenEntry={setSelectedEntry}
         />
       )}
 

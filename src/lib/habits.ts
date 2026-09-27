@@ -1,10 +1,22 @@
 import { supabase } from './supabase'
-import type { Habit, RecurrenceRule } from '../types'
+import type { Entry, Habit, RecurrenceRule } from '../types'
 
 export async function fetchHabit(habitId: string): Promise<Habit | null> {
   const { data, error } = await supabase.from('habits').select('*').eq('id', habitId).maybeSingle()
   if (error) throw error
   return data as Habit | null
+}
+
+/** The entry that represents a Habit's series definition (undated, hidden from daily/upcoming views). */
+export async function fetchRecurrenceTemplate(habitId: string): Promise<Entry | null> {
+  const { data, error } = await supabase
+    .from('entries')
+    .select('*')
+    .eq('habit_id', habitId)
+    .eq('is_recurrence_template', true)
+    .maybeSingle()
+  if (error) throw error
+  return data as Entry | null
 }
 
 /** Which of the given habit ids are currently active (a member of their user's Routine). */
@@ -67,13 +79,13 @@ export async function setEntryRecurrence(
     if (error) throw error
     habitId = data.id
 
-    // The entry being turned into a repeat is a one-off template from here on, not an
-    // occurrence itself — archive it so only the generator's dated occurrences show up
-    // in daily/upcoming lists (otherwise an undated template and today's generated
-    // occurrence both show at once).
+    // The entry being turned into a repeat becomes the series' template from here on,
+    // not an occurrence itself — undated, excluded from daily/upcoming views (only the
+    // generator's dated occurrences show there), and it's the one row Library shows to
+    // represent the whole series.
     const { error: linkError } = await supabase
       .from('entries')
-      .update({ habit_id: habitId, archived_at: new Date().toISOString() })
+      .update({ habit_id: habitId, is_recurrence_template: true, due_date: null, due_time: null })
       .eq('id', entryId)
     if (linkError) throw linkError
   }

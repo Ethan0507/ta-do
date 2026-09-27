@@ -192,6 +192,7 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
           categoryIds={entryCategoryIds[selectedEntry.id] ?? []}
           onClose={() => setSelectedEntry(null)}
           onChanged={reload}
+          onOpenEntry={setSelectedEntry}
         />
       )}
     </div>

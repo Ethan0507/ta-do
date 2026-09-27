@@ -16,8 +16,18 @@ function todayRange(): { startISO: string; endISO: string } {
   return { startISO: start.toISOString(), endISO: end.toISOString() }
 }
 
+/**
+ * Library listing: every entry except a repeating task's generated occurrences
+ * (habit_id set but not the template itself) — those would flood Library with
+ * months of daily rows. The template row (is_recurrence_template) represents the
+ * whole series there instead.
+ */
 export async function fetchEntries(includeArchived: boolean): Promise<Entry[]> {
-  let query = supabase.from('entries').select('*').order('created_at', { ascending: false })
+  let query = supabase
+    .from('entries')
+    .select('*')
+    .or('habit_id.is.null,is_recurrence_template.eq.true')
+    .order('created_at', { ascending: false })
   if (!includeArchived) {
     query = query.is('archived_at', null)
   }
@@ -26,12 +36,13 @@ export async function fetchEntries(includeArchived: boolean): Promise<Entry[]> {
   return data as Entry[]
 }
 
-/** Today's active (not-yet-completed) entries of a given type, in manual order. */
+/** Today's active (not-yet-completed) entries of a given type, in manual order. Excludes recurrence template rows. */
 export async function fetchTodayEntries(type: EntryType): Promise<Entry[]> {
   let query = supabase
     .from('entries')
     .select('*')
     .eq('type', type)
+    .eq('is_recurrence_template', false)
     .is('archived_at', null)
     .order('position', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false })
@@ -50,13 +61,14 @@ export async function fetchTodayEntries(type: EntryType): Promise<Entry[]> {
 
 export const UPCOMING_TASKS_PAGE_SIZE = 20
 
-/** One page of open tasks regardless of date, dated ones soonest-first then undated ones newest-first. */
+/** One page of open tasks regardless of date, dated ones soonest-first then undated ones newest-first. Excludes recurrence template rows. */
 export async function fetchUpcomingTasks(offset: number, limit: number = UPCOMING_TASKS_PAGE_SIZE): Promise<Entry[]> {
   const { data, error } = await supabase
     .from('entries')
     .select('*')
     .eq('type', 'task')
     .eq('task_status', 'open')
+    .eq('is_recurrence_template', false)
     .is('archived_at', null)
     .order('due_date', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false })
@@ -77,6 +89,7 @@ export async function fetchCompletedToday(type: 'task' | 'goal'): Promise<Entry[
     .select('*')
     .eq('type', type)
     .eq(statusColumn, statusValue)
+    .eq('is_recurrence_template', false)
     .gte(timeColumn, startISO)
     .lt(timeColumn, endISO)
     .order(timeColumn, { ascending: false })

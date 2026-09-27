@@ -10,7 +10,7 @@ import {
   updateEntryNotes,
   updateEntryType,
 } from '../lib/entries'
-import { fetchActiveHabitIds, fetchHabit, setEntryRecurrence } from '../lib/habits'
+import { fetchActiveHabitIds, fetchHabit, fetchRecurrenceTemplate, setEntryRecurrence } from '../lib/habits'
 import { createCategory } from '../lib/categories'
 import { CategoryPicker } from './CategoryPicker'
 import { TypeSelector } from './TypeSelector'
@@ -23,6 +23,7 @@ interface EntryDetailProps {
   categoryIds: string[]
   onClose: () => void
   onChanged: () => void
+  onOpenEntry: (entry: Entry) => void
 }
 
 function sameIds(a: string[], b: string[]): boolean {
@@ -31,7 +32,9 @@ function sameIds(a: string[], b: string[]): boolean {
   return a.every((id) => setB.has(id))
 }
 
-export function EntryDetail({ entry, userId, categories, categoryIds, onClose, onChanged }: EntryDetailProps) {
+export function EntryDetail({ entry, userId, categories, categoryIds, onClose, onChanged, onOpenEntry }: EntryDetailProps) {
+  const isTemplate = entry.is_recurrence_template
+  const isOccurrence = Boolean(entry.habit_id) && !isTemplate
   const [content, setContent] = useState(entry.content)
   const [notes, setNotes] = useState(entry.notes ?? '')
   const [type, setType] = useState<EntryType>(entry.type)
@@ -52,7 +55,7 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
   useEffect(() => {
     let cancelled = false
     async function loadRecurrence() {
-      if (!entry.habit_id) return
+      if (!entry.habit_id || !isTemplate) return
       const [habit, activeIds] = await Promise.all([fetchHabit(entry.habit_id), fetchActiveHabitIds([entry.habit_id])])
       if (cancelled || !habit || !activeIds.has(entry.habit_id)) return
       setRule(habit.recurrence_rule)
@@ -62,16 +65,25 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
     return () => {
       cancelled = true
     }
-  }, [entry.habit_id])
+  }, [entry.habit_id, isTemplate])
+
+  async function handleOpenTemplate() {
+    if (!entry.habit_id) return
+    const template = await fetchRecurrenceTemplate(entry.habit_id)
+    if (template) onOpenEntry(template)
+  }
 
   const originalIsDone = entry.type === 'task' ? entry.task_status === 'done' : entry.type === 'goal' ? entry.goal_status === 'achieved' : false
+
+  const ruleChanged = JSON.stringify(rule) !== JSON.stringify(initialRule)
+  const templateContentChanged = isTemplate && Boolean(content.trim()) && content.trim() !== entry.content
 
   const isDirty =
     type !== entry.type ||
     content.trim() !== entry.content ||
     notes.trim() !== (entry.notes ?? '') ||
-    (type === 'task' && dueDate !== (entry.due_date ?? '')) ||
-    (type === 'task' && JSON.stringify(rule) !== JSON.stringify(initialRule)) ||
+    (type === 'task' && !isTemplate && dueDate !== (entry.due_date ?? '')) ||
+    (type === 'task' && !isOccurrence && ruleChanged) ||
     (type === entry.type && type !== 'thought' && isDone !== originalIsDone) ||
     !sameIds(localCategoryIds, categoryIds)
 
@@ -81,8 +93,10 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
     }
     if (type === 'task') {
       await setTaskStatus(entry.id, isDone ? 'done' : 'open')
-      await updateEntryDueDate(entry.id, dueDate || null)
-      if (JSON.stringify(rule) !== JSON.stringify(initialRule)) {
+      if (!isTemplate) {
+        await updateEntryDueDate(entry.id, dueDate || null)
+      }
+      if (!isOccurrence && (ruleChanged || templateContentChanged)) {
         await setEntryRecurrence(entry.id, userId, content.trim() || entry.content, rule, entry.habit_id)
       }
     } else if (type === 'goal') {
@@ -134,7 +148,7 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
           className="w-full resize-none rounded-2xl border-[1.5px] border-[var(--color-primary)] bg-white/45 px-[18px] py-3.5 text-[15px] text-[var(--color-text)] outline-none"
         />
 
-        {type === 'task' && (
+        {type === 'task' && !isTemplate && (
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-semibold text-[var(--color-text-muted)]">Due date</span>
             <input
@@ -146,7 +160,23 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
           </label>
         )}
 
-        {type === 'task' && <RepeatPicker value={rule} dueDate={dueDate} onChange={setRule} />}
+        {type === 'task' && isOccurrence && (
+          <button
+            type="button"
+            onClick={handleOpenTemplate}
+            className="flex w-fit items-center gap-1.5 rounded-full bg-white/45 px-3.5 py-1.5 text-xs font-bold text-[var(--color-primary)]"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 2.1l4 4-4 4" />
+              <path d="M3 12.1v-2a4 4 0 0 1 4-4h14" />
+              <path d="M7 21.9l-4-4 4-4" />
+              <path d="M21 11.9v2a4 4 0 0 1-4 4H3" />
+            </svg>
+            Edit repeating task
+          </button>
+        )}
+
+        {type === 'task' && !isOccurrence && <RepeatPicker value={rule} dueDate={dueDate} onChange={setRule} />}
 
         {type !== 'thought' && (
           <button

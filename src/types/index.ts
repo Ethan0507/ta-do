@@ -49,6 +49,7 @@ export interface Entry {
   priority: number | null
   task_status: TaskStatus | null
   completed_at: string | null
+  is_recurrence_template: boolean
 
   // Goal-specific
   period_scope: PeriodScope | null

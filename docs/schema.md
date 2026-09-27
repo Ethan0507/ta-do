@@ -67,6 +67,7 @@ Type-specific fields:
 |---|---|---|
 | due_date / scheduled_date | Task | drives which daily/weekly list it appears in. **If null, the Task floats in the current daily altitude view by default** — undated/uncategorized entries are meant to surface there, not get lost in Library only |
 | due_time | Task, nullable | time-of-day, only ever set by the recurrence generator (see Habit below) for a `custom` rule's specific times; not manually editable |
+| is_recurrence_template | Task, boolean, default false | true = this row IS a repeating task's series definition, not a dated occurrence — see Habit below |
 | priority | Task | for library sorting |
 | status | Task | open / done |
 | completed_at | Task | timestamp, feeds rollup stats |
@@ -117,9 +118,10 @@ Many-to-many: **a Habit can contribute to a Goal, and a Goal can have multiple H
 Created via the "Repeat" picker on a Task Entry's detail sheet (Daily / Weekly / Monthly / Custom, modeled on Reminders.app's repeat UX). Daily and Weekly optionally carry a single time of day (no time = generates any time that day, matching the app's existing no-time-of-day default); Weekly also lets you pick which weekday. Custom requires explicit weekdays and one or more times of day. Flow:
 1. User sets a repeat option on a Task Entry.
 2. A Habit row is created — `title` copied from the Entry's content, `recurrence_rule` set from the picker.
-3. The original Entry's `habit_id` is set to point at the new Habit, and the Entry is **archived immediately** — it was a one-off template, not an occurrence itself, and its due date (or lack of one) generally won't match what the recurrence rule actually calls for. Leaving it active would show up alongside the generator's real occurrences as a visible duplicate.
+3. The original Entry's `habit_id` is set to point at the new Habit, and the Entry is marked `is_recurrence_template = true` and undated (`due_date`/`due_time` cleared). It's the series' definition from here on, not an occurrence — its own due date (or lack of one) generally wouldn't match what the rule actually calls for, so it's excluded from Daily/Upcoming views (see "Not stored — computed views" below) while still showing normally in Library, where it represents the whole series. Editing its content there renames all future occurrences (updates `habits.title`); editing its Repeat picker updates the rule.
 4. The new Habit's id is added to the user's **Routine** (see below) — this is also how it becomes active.
-5. A scheduled Postgres job (`generate_habit_entries()`, run via `pg_cron` every 15 minutes — see migrations `0009_recurring_tasks.sql` and `0010_optional_recurrence_time.sql`) creates each new Task Entry on schedule, independent of whether the prior occurrence was completed. It dedupes per Habit + due_date (+ due_time when a time is set) so a missed or re-run tick never double-generates. Step 3 also fires this generator immediately (best-effort, via RPC) so the first real occurrence appears right away rather than waiting for the next tick.
+5. A scheduled Postgres job (`generate_habit_entries()`, run via `pg_cron` every 15 minutes — see migrations `0009_recurring_tasks.sql` and `0010_optional_recurrence_time.sql`) creates each new Task Entry on schedule (`is_recurrence_template = false`), independent of whether the prior occurrence was completed. It dedupes per Habit + due_date (+ due_time when a time is set) so a missed or re-run tick never double-generates. Step 3 also fires this generator immediately (best-effort, via RPC) so the first real occurrence appears right away rather than waiting for the next tick.
+6. From a generated occurrence's detail sheet, an "Edit repeating task" button (instead of the Repeat picker directly) opens the template Entry from step 3 — editing the rule or renaming the series happens there, not on an individual dated occurrence.
 
 **Streak is not a stored field.** It's computed by reading `completed_at` across all Entries sharing a given `habit_id`, so it can never drift out of sync with actual entry data — no `streak_count` column needed on Habit itself.
 
@@ -184,8 +186,9 @@ No uniqueness constraint on (user_id, period_type, period_identifier) — a sing
 
 ## Not stored — computed views
 
-- **Altitude View**: a query over Entry (+ Category, + PeriodTarget) filtered/grouped by day/week/month/year. Not a table. Undated Tasks default into the current daily altitude view (the "parking lot" — this is the default view for most users).
+- **Altitude View**: a query over Entry (+ Category, + PeriodTarget) filtered/grouped by day/week/month/year. Not a table. Undated Tasks default into the current daily altitude view (the "parking lot" — this is the default view for most users). Exception: an entry with `is_recurrence_template = true` never floats in here regardless of its (null) due date — it's a series definition, not an occurrence.
 - **Rollup/Summary**: computed aggregation of Entry completion/status for a given period + category, shown alongside PeriodTarget. For Tasks this reads `status`/`completed_at`; for Goals it reads `status`/`achieved_at`, optionally factoring in linked Habits via GoalHabit. Not a table.
+- **Recurrence template/occurrence split**: Daily and Upcoming views query `is_recurrence_template = false` (occurrences only); Library queries `habit_id IS NULL OR is_recurrence_template = true` (the template row or a plain non-repeating entry — never a generated occurrence, which would flood Library over time). Not separate tables, just complementary filters over the same `entries` rows.
 
 ---
 
