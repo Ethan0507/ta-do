@@ -1,7 +1,7 @@
 # Ta-do — Schema (Draft v0.3)
 
-Status: core entities resolved; auth + Shortcuts capture shipped and in production; Habit/Routine layer still being finalized; one open question remains (UserSettings fields).
-Last updated: 2026-09-16
+Status: core entities resolved; auth + Shortcuts capture shipped and in production; Habit/Routine layer shipped as the recurring-tasks feature; one open question remains (UserSettings fields).
+Last updated: 2026-09-27
 
 This is the schema after tallying against feature requirements. Backend: **Supabase** (Postgres + Auth + Realtime), same as routein — chosen so multiple users can use the app simultaneously (this is a real multi-user app from day one, not just schema-shaped for it; currently only one person uses it, but concurrent multi-user is a hard requirement, not a nice-to-have).
 
@@ -66,6 +66,7 @@ Type-specific fields:
 | Field | Applies to | Notes |
 |---|---|---|
 | due_date / scheduled_date | Task | drives which daily/weekly list it appears in. **If null, the Task floats in the current daily altitude view by default** — undated/uncategorized entries are meant to surface there, not get lost in Library only |
+| due_time | Task, nullable | time-of-day, only ever set by the recurrence generator (see Habit below) for a `custom` rule's specific times; not manually editable |
 | priority | Task | for library sorting |
 | status | Task | open / done |
 | completed_at | Task | timestamp, feeds rollup stats |
@@ -100,23 +101,31 @@ Many-to-many: **a Habit can contribute to a Goal, and a Goal can have multiple H
 | id | uuid | |
 | user_id | uuid (FK → User) | |
 | title | string | template content for generated Entries |
-| recurrence_rule | string/struct | e.g. daily, specific weekdays |
+| recurrence_rule | jsonb | see shapes below |
 | created_at | timestamp | |
 
-Created via a "track as habit" action on an existing Task Entry (not created standalone). Flow:
-1. User hits "track as habit" on a Task Entry.
-2. A Habit row is created — `title` copied from the Entry's content, `recurrence_rule` set at that point.
+`recurrence_rule` shapes (one of):
+```jsonc
+{ "freq": "daily" }
+{ "freq": "weekly", "weekday": 0 }                      // 0 = Sunday .. 6 = Saturday
+{ "freq": "monthly", "day_of_month": 15 }
+{ "freq": "custom", "weekdays": [1, 3, 5], "times": ["09:00", "18:00"] }
+```
+
+Created via the "Repeat" picker on a Task Entry's detail sheet (Daily / Weekly / Monthly / Custom — Custom lets you pick specific weekdays and one or more times of day). Flow:
+1. User sets a repeat option on a Task Entry.
+2. A Habit row is created — `title` copied from the Entry's content, `recurrence_rule` set from the picker.
 3. The original Entry's `habit_id` is set to point at the new Habit (it becomes the first occurrence).
-4. Each subsequent period, a new Task Entry auto-generates with the same `habit_id`.
-5. The new Habit's id is added to the user's **Routine** (see below) — this is also how it becomes visible/active.
+4. The new Habit's id is added to the user's **Routine** (see below) — this is also how it becomes active.
+5. A scheduled Postgres job (`generate_habit_entries()`, run via `pg_cron` every 15 minutes — see migration `0009_recurring_tasks.sql`) creates each new Task Entry on schedule, independent of whether the prior occurrence was completed. It dedupes per Habit + due_date (+ due_time for `custom`) so a missed or re-run tick never double-generates.
 
 **Streak is not a stored field.** It's computed by reading `completed_at` across all Entries sharing a given `habit_id`, so it can never drift out of sync with actual entry data — no `streak_count` column needed on Habit itself.
 
 **`active` boolean removed** — superseded by Routine membership (see below): a Habit not currently in the Routine is effectively paused, without losing its definition or history.
 
-## Routine / RoutineHabit — **draft, not yet finalized**
+## Routine / RoutineHabit
 
-Modeled after how routein manages routines. Intent: the Routine is a lightweight container that acts as a **filter over "habits currently planned"** — Habit rows remain the source of truth for definition/recurrence/history, and Routine membership just marks which ones are currently active/surfaced.
+Intent: the Routine is a lightweight container that acts as a **filter over "habits currently planned"** — Habit rows remain the source of truth for definition/recurrence/history, and Routine membership just marks which ones are currently active/surfaced (and thus generating new Entries).
 
 | Table | Field | Type | Notes |
 |---|---|---|---|
@@ -126,14 +135,11 @@ Modeled after how routein manages routines. Intent: the Routine is a lightweight
 | RoutineHabit | routine_id | uuid (FK → Routine) | |
 | RoutineHabit | habit_id | uuid (FK → Habit) | |
 
-Flow: a user starts with an empty Routine. As Entries are converted to Habits, the new Habit's id is added to the Routine (see Habit flow above, step 5). Removing a habit_id from RoutineHabit pauses it (stops new Entry generation, keeps history) without deleting the Habit.
+Flow: a user starts with an empty Routine, created lazily (one per user) the first time a repeat is set. As Entries are converted to Habits, the new Habit's id is added to the Routine (see Habit flow above, step 4). Removing a habit_id from RoutineHabit pauses it (stops new Entry generation, keeps history) without deleting the Habit — this is what clearing the "Repeat" option on a Task does.
 
 Visualization: habits within the Routine can be grouped by recurrence (daily / weekly / monthly, etc.) for display — this is a query concern, not a schema one.
 
-**Open questions on this model (needs more design time before build):**
-- One Routine per user, or can a user have multiple named Routines (e.g. "Morning," "Work")? Current framing ("the routine") suggests one, but worth confirming against routein's actual model.
-- Does removing a habit from the Routine stop entry generation immediately, or let the current period's Entry finish first?
-- Should pausing (removal from Routine) be distinguishable from "done with this habit forever," or is it the same state?
+**Resolved for the recurring-tasks feature:** one Routine per user (lazily created); removing a habit from the Routine stops generation immediately (no in-flight occurrence is force-completed); pausing and "done forever" are the same state today — there's no separate archival of a Habit definition yet.
 
 ## PeriodTarget
 
@@ -195,8 +201,9 @@ No uniqueness constraint on (user_id, period_type, period_identifier) — a sing
 - Entry `notes` field → added, freeform text separate from `content`, nullable.
 - Shortcuts capture endpoint auth → per-user hashed capture token (see dedicated section above), not a single shared secret.
 - First-run onboarding → `profiles.onboarded_at`, walkthrough shown once, dismissible or auto-completed by a live capture test.
+- Routine model → resolved for the recurring-tasks feature scope: one Routine per user, lazily created; see Habit/Routine sections above.
+- Recurring tasks → shipped via Habit/Routine + `entries.due_time` + the `generate_habit_entries()` scheduled job (migration `0009_recurring_tasks.sql`).
 
 ## Open questions still to resolve
 
 1. UserSettings — what actually belongs here beyond `default_altitude`
-2. Routine model — see open questions under Routine/RoutineHabit above; needs a proper design pass, possibly informed by reading routein's actual routine implementation

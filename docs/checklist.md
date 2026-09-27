@@ -1,6 +1,6 @@
 # Ta-do — Checklist
 
-Last updated: 2026-09-16
+Last updated: 2026-09-27
 
 ## Success Metric (MVP)
 MVP succeeds if Ethan uses Ta-do **daily for 2 consecutive weeks** as his sole capture point for personal thoughts/tasks (replacing iOS Notes) and work-adjacent personal capture (replacing Slack self-DMs/personal chats), with nothing he cared about falling through the cracks during that window. Checked subjectively at the end of the 2 weeks — did anything get lost, did he revert to Notes or Slack even once — not via an in-app analytics event.
@@ -22,7 +22,7 @@ MVP succeeds if Ethan uses Ta-do **daily for 2 consecutive weeks** as his sole c
 ## Data Model
 - [x] Skeleton schema drafted and validated against features (see schema.md)
 - [x] Resolve: Habit as own entity vs. Task + recurrence rule → own entity
-- [ ] Finalize Routine model on top of Habit (one per user vs. multiple, pause semantics) — needs design pass, likely referencing routein's actual implementation
+- [x] Finalize Routine model on top of Habit — resolved for the recurring-tasks feature: one Routine per user, lazily created; pause = remove from Routine, stops generation immediately (see schema.md)
 - [ ] Resolve: UserSettings full field list
 - [x] Resolve: PeriodTarget granularity → multiple rows per period allowed, per-category or overall
 - [x] Resolve: Goal completion → status enum (ongoing/achieved) + achieved_at
@@ -45,7 +45,7 @@ MVP succeeds if Ethan uses Ta-do **daily for 2 consecutive weeks** as his sole c
 ## MVP Complete — build after Core, still required to call the MVP done, lower priority
 - [ ] Altitude changer (day default → week/month/year zoom), undated/uncategorized Tasks float in daily view by default
 - [ ] Period target input (manual "ideal vision")
-- [ ] Habit tracking MVP slice (basic "track as habit" + Routine membership; full Routine visualization can wait)
+- [x] Habit tracking MVP slice — shipped as **recurring tasks**: a "Repeat" picker (Daily/Weekly/Monthly/Custom) directly on a Task's detail sheet, backed by Habit + Routine membership and a `pg_cron`-scheduled generator (see schema.md, migration `0009_recurring_tasks.sql`). Full Routine visualization (grouping by recurrence) still waits.
 - [ ] Goal check-off (ongoing/achieved) + linking to Habits
 
 ## Multi-User
@@ -69,6 +69,7 @@ Note: basic Supabase Auth + RLS (data scoped per user_id) are pulled forward int
 - [ ] Online-research suggestions for recurring tasks
 - [ ] Deeper Siri integration (beyond Shortcuts)
 - [ ] Full Routine visualization (grouping habits by recurrence: daily/weekly/monthly)
+- [ ] **Good to have:** detect when a Thought actually contains multiple discrete tasks, and offer a one-click "break down" action that splits it into separate Task entries
 
 ## Standard App Essentials
 - [x] Login/signup (Supabase Auth — email magic link + Google OAuth)
@@ -82,8 +83,9 @@ Note: basic Supabase Auth + RLS (data scoped per user_id) are pulled forward int
 - [x] Production hosting on Vercel (ta-do.vercel.app)
 - [x] Supabase project provisioned, migrations applied
 - [x] Supabase Auth redirect URLs configured for both localhost (dev) and the production domain
+- [x] `pg_cron` extension enabled + `generate_habit_entries()` scheduled (every 15 min) for recurring-task generation
 - [ ] Custom SMTP provider (currently on Supabase's default sender — fine for personal use, has a low hourly send-rate limit)
+- [ ] Reconcile CLI migration ledger — migrations `0004`–`0009` were applied directly via the Supabase SQL editor rather than `supabase db push`, so the schema is correct but the CLI's local ledger doesn't know it; run `supabase migration repair --status applied 0004 0005 0006 0007 0008 0009 --linked` next time it's convenient so future `db push` runs don't choke on it
 
 ## Open Questions
-- Routine model: one per user or multiple named routines? Pause vs. permanently-done semantics when a habit is removed from the Routine?
 - UserSettings: what belongs here beyond default altitude view?

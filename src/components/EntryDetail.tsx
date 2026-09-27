@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { Category, Entry, EntryType } from '../types'
+import { useEffect, useState } from 'react'
+import type { Category, Entry, EntryType, RecurrenceRule } from '../types'
 import {
   setArchived,
   setGoalStatus,
@@ -10,9 +10,11 @@ import {
   updateEntryNotes,
   updateEntryType,
 } from '../lib/entries'
+import { fetchActiveHabitIds, fetchHabit, setEntryRecurrence } from '../lib/habits'
 import { createCategory } from '../lib/categories'
 import { CategoryPicker } from './CategoryPicker'
 import { TypeSelector } from './TypeSelector'
+import { RepeatPicker } from './RepeatPicker'
 
 interface EntryDetailProps {
   entry: Entry
@@ -34,6 +36,8 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
   const [notes, setNotes] = useState(entry.notes ?? '')
   const [type, setType] = useState<EntryType>(entry.type)
   const [dueDate, setDueDate] = useState(entry.due_date ?? '')
+  const [rule, setRule] = useState<RecurrenceRule | null>(null)
+  const [initialRule, setInitialRule] = useState<RecurrenceRule | null>(null)
   const [localCategoryIds, setLocalCategoryIds] = useState<string[]>(categoryIds)
   const [detailsOpen, setDetailsOpen] = useState(Boolean(entry.notes) || categoryIds.length > 0)
   const [isDone, setIsDone] = useState(
@@ -45,6 +49,21 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
     setIsDone(false)
   }
 
+  useEffect(() => {
+    let cancelled = false
+    async function loadRecurrence() {
+      if (!entry.habit_id) return
+      const [habit, activeIds] = await Promise.all([fetchHabit(entry.habit_id), fetchActiveHabitIds([entry.habit_id])])
+      if (cancelled || !habit || !activeIds.has(entry.habit_id)) return
+      setRule(habit.recurrence_rule)
+      setInitialRule(habit.recurrence_rule)
+    }
+    loadRecurrence()
+    return () => {
+      cancelled = true
+    }
+  }, [entry.habit_id])
+
   const originalIsDone = entry.type === 'task' ? entry.task_status === 'done' : entry.type === 'goal' ? entry.goal_status === 'achieved' : false
 
   const isDirty =
@@ -52,6 +71,7 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
     content.trim() !== entry.content ||
     notes.trim() !== (entry.notes ?? '') ||
     (type === 'task' && dueDate !== (entry.due_date ?? '')) ||
+    (type === 'task' && JSON.stringify(rule) !== JSON.stringify(initialRule)) ||
     (type === entry.type && type !== 'thought' && isDone !== originalIsDone) ||
     !sameIds(localCategoryIds, categoryIds)
 
@@ -62,6 +82,9 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
     if (type === 'task') {
       await setTaskStatus(entry.id, isDone ? 'done' : 'open')
       await updateEntryDueDate(entry.id, dueDate || null)
+      if (JSON.stringify(rule) !== JSON.stringify(initialRule)) {
+        await setEntryRecurrence(entry.id, userId, content.trim() || entry.content, rule, entry.habit_id)
+      }
     } else if (type === 'goal') {
       await setGoalStatus(entry.id, isDone ? 'achieved' : 'ongoing')
     }
@@ -122,6 +145,8 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
             />
           </label>
         )}
+
+        {type === 'task' && <RepeatPicker value={rule} dueDate={dueDate} onChange={setRule} />}
 
         {type !== 'thought' && (
           <button

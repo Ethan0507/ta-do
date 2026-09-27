@@ -39,7 +39,24 @@ export function DailyRow({ entry, checkable, onCheck, onOpen }: DailyRowProps) {
 
       <div className="min-w-0 flex-1">
         <p className="text-[14.5px] font-semibold text-[var(--color-text)]">{entry.content}</p>
-        {entry.due_date && <p className="text-[11.5px] text-[var(--color-text-muted)]">Due {entry.due_date}</p>}
+        {(entry.due_date || entry.habit_id) && (
+          <p className="flex items-center gap-1 text-[11.5px] text-[var(--color-text-muted)]">
+            {entry.due_date && (
+              <span>
+                Due {entry.due_date}
+                {entry.due_time && ` ${entry.due_time.slice(0, 5)}`}
+              </span>
+            )}
+            {entry.habit_id && (
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-label="Repeats">
+                <path d="M17 2.1l4 4-4 4" />
+                <path d="M3 12.1v-2a4 4 0 0 1 4-4h14" />
+                <path d="M7 21.9l-4-4 4-4" />
+                <path d="M21 11.9v2a4 4 0 0 1-4 4H3" />
+              </svg>
+            )}
+          </p>
+        )}
       </div>
 
       <button
