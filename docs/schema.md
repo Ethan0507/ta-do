@@ -107,17 +107,19 @@ Many-to-many: **a Habit can contribute to a Goal, and a Goal can have multiple H
 `recurrence_rule` shapes (one of):
 ```jsonc
 { "freq": "daily" }
+{ "freq": "daily", "time": "09:00" }                    // time is optional
 { "freq": "weekly", "weekday": 0 }                      // 0 = Sunday .. 6 = Saturday
+{ "freq": "weekly", "weekday": 0, "time": "09:00" }     // time is optional
 { "freq": "monthly", "day_of_month": 15 }
 { "freq": "custom", "weekdays": [1, 3, 5], "times": ["09:00", "18:00"] }
 ```
 
-Created via the "Repeat" picker on a Task Entry's detail sheet (Daily / Weekly / Monthly / Custom — Custom lets you pick specific weekdays and one or more times of day). Flow:
+Created via the "Repeat" picker on a Task Entry's detail sheet (Daily / Weekly / Monthly / Custom, modeled on Reminders.app's repeat UX). Daily and Weekly optionally carry a single time of day (no time = generates any time that day, matching the app's existing no-time-of-day default); Weekly also lets you pick which weekday. Custom requires explicit weekdays and one or more times of day. Flow:
 1. User sets a repeat option on a Task Entry.
 2. A Habit row is created — `title` copied from the Entry's content, `recurrence_rule` set from the picker.
 3. The original Entry's `habit_id` is set to point at the new Habit (it becomes the first occurrence).
 4. The new Habit's id is added to the user's **Routine** (see below) — this is also how it becomes active.
-5. A scheduled Postgres job (`generate_habit_entries()`, run via `pg_cron` every 15 minutes — see migration `0009_recurring_tasks.sql`) creates each new Task Entry on schedule, independent of whether the prior occurrence was completed. It dedupes per Habit + due_date (+ due_time for `custom`) so a missed or re-run tick never double-generates.
+5. A scheduled Postgres job (`generate_habit_entries()`, run via `pg_cron` every 15 minutes — see migrations `0009_recurring_tasks.sql` and `0010_optional_recurrence_time.sql`) creates each new Task Entry on schedule, independent of whether the prior occurrence was completed. It dedupes per Habit + due_date (+ due_time when a time is set) so a missed or re-run tick never double-generates.
 
 **Streak is not a stored field.** It's computed by reading `completed_at` across all Entries sharing a given `habit_id`, so it can never drift out of sync with actual entry data — no `streak_count` column needed on Habit itself.
 

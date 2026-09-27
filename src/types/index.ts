@@ -6,8 +6,8 @@ export type ThemePreference = 'light' | 'dark' | 'auto'
 export type RecurrenceFreq = 'daily' | 'weekly' | 'monthly' | 'custom'
 
 export type RecurrenceRule =
-  | { freq: 'daily' }
-  | { freq: 'weekly'; weekday: number } // 0 = Sunday .. 6 = Saturday
+  | { freq: 'daily'; time?: string } // time as "HH:MM", optional
+  | { freq: 'weekly'; weekday: number; time?: string } // weekday: 0 = Sunday .. 6 = Saturday
   | { freq: 'monthly'; day_of_month: number }
   | { freq: 'custom'; weekdays: number[]; times: string[] } // times as "HH:MM"
 
