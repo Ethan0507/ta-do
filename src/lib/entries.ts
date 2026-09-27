@@ -138,6 +138,12 @@ export function getTopPosition(orderedEntries: Entry[]): number {
   return (top ?? POSITION_GAP) - POSITION_GAP
 }
 
+/** Positions for `count` freshly captured entries, topmost first, all landing above today's current top. */
+export function getTopPositionsForBatch(orderedEntries: Entry[], count: number): number[] {
+  const top = orderedEntries[0]?.position ?? POSITION_GAP
+  return Array.from({ length: count }, (_, i) => top - POSITION_GAP * (count - i))
+}
+
 /** Fractional position for an entry that just landed at `index` in a freshly reordered array. */
 export function computeReorderedPosition(orderedEntries: Entry[], index: number): number {
   const prev = orderedEntries[index - 1]?.position ?? null

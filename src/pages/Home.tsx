@@ -9,6 +9,7 @@ import {
   fetchEntryCategoryIds,
   fetchTodayEntries,
   getTopPosition,
+  getTopPositionsForBatch,
   setGoalStatus,
   setTaskStatus,
   updateEntryPosition,
@@ -65,6 +66,14 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
 
   async function handleCapture(content: string) {
     await createEntry(session.user.id, type, content, null, getTopPosition(entries))
+    await reload()
+  }
+
+  async function handleCaptureMany(contents: string[]) {
+    const positions = getTopPositionsForBatch(entries, contents.length)
+    for (let i = 0; i < contents.length; i++) {
+      await createEntry(session.user.id, type, contents[i], null, positions[i])
+    }
     await reload()
   }
 
@@ -169,7 +178,7 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
         </div>
       </div>
 
-      <CaptureFab type={type} onCapture={handleCapture} />
+      <CaptureFab type={type} onCapture={handleCapture} onCaptureMany={handleCaptureMany} />
 
       {showUpcoming && (
         <UpcomingTasksSheet onClose={() => setShowUpcoming(false)} onChanged={reload} onOpenEntry={setSelectedEntry} />

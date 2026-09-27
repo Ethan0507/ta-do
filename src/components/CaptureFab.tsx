@@ -1,9 +1,11 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react'
 import type { EntryType } from '../types'
+import { BulkTaskDraftSheet } from './BulkTaskDraftSheet'
 
 interface CaptureFabProps {
   type: EntryType
   onCapture: (content: string) => Promise<void>
+  onCaptureMany: (contents: string[]) => Promise<void>
 }
 
 const TYPE_LABEL: Record<EntryType, string> = {
@@ -12,19 +14,63 @@ const TYPE_LABEL: Record<EntryType, string> = {
   goal: 'goal',
 }
 
-export function CaptureFab({ type, onCapture }: CaptureFabProps) {
+export function CaptureFab({ type, onCapture, onCaptureMany }: CaptureFabProps) {
   const [open, setOpen] = useState(false)
   const [content, setContent] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [draftLines, setDraftLines] = useState<string[] | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  function resetTextareaHeight() {
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+  }
+
+  function handleTextareaInput(e: ChangeEvent<HTMLTextAreaElement>) {
+    setContent(e.target.value)
+    const el = textareaRef.current
+    if (el) {
+      el.style.height = 'auto'
+      el.style.height = `${el.scrollHeight}px`
+    }
+  }
+
+  function handleTextareaKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      formRef.current?.requestSubmit()
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!content.trim()) return
+
+    if (type === 'task') {
+      const lines = content
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+      if (lines.length > 1) {
+        setDraftLines(lines)
+        setContent('')
+        resetTextareaHeight()
+        setOpen(false)
+        return
+      }
+    }
+
     setSubmitting(true)
     await onCapture(content.trim())
     setSubmitting(false)
     setContent('')
+    resetTextareaHeight()
     setOpen(false)
+  }
+
+  async function handleConfirmMany(contents: string[]) {
+    await onCaptureMany(contents)
+    setDraftLines(null)
   }
 
   return (
@@ -48,6 +94,7 @@ export function CaptureFab({ type, onCapture }: CaptureFabProps) {
             onClick={() => setOpen(false)}
           />
           <form
+            ref={formRef}
             onSubmit={handleSubmit}
             className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-md flex-col gap-4 rounded-t-[28px] border-t border-[var(--glass-border)] bg-[var(--glass-fill-strong)] px-5 pb-8 pt-3.5 shadow-[0_-12px_34px_oklch(30%_0.05_285_/_0.2)] backdrop-blur-3xl"
           >
@@ -66,15 +113,28 @@ export function CaptureFab({ type, onCapture }: CaptureFabProps) {
 
             <span className="text-[12.5px] font-bold text-[var(--color-primary)]">New {TYPE_LABEL[type]}</span>
 
-            <div className="flex items-center gap-3">
-              <input
-                type="text"
-                autoFocus
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="What's on your mind?"
-                className="flex-1 rounded-2xl border-[1.5px] border-[var(--color-primary)] bg-white/45 px-[18px] py-4 text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
-              />
+            <div className="flex items-end gap-3">
+              {type === 'task' ? (
+                <textarea
+                  ref={textareaRef}
+                  autoFocus
+                  value={content}
+                  onChange={handleTextareaInput}
+                  onKeyDown={handleTextareaKeyDown}
+                  placeholder="What's on your mind? One task per line to add several at once."
+                  rows={1}
+                  className="max-h-48 flex-1 resize-none overflow-y-auto rounded-2xl border-[1.5px] border-[var(--color-primary)] bg-white/45 px-[18px] py-4 text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+                />
+              ) : (
+                <input
+                  type="text"
+                  autoFocus
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="What's on your mind?"
+                  className="flex-1 rounded-2xl border-[1.5px] border-[var(--color-primary)] bg-white/45 px-[18px] py-4 text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+                />
+              )}
               <button
                 type="submit"
                 disabled={submitting || !content.trim()}
@@ -87,6 +147,10 @@ export function CaptureFab({ type, onCapture }: CaptureFabProps) {
             </div>
           </form>
         </>
+      )}
+
+      {draftLines && (
+        <BulkTaskDraftSheet initialLines={draftLines} onClose={() => setDraftLines(null)} onConfirm={handleConfirmMany} />
       )}
     </>
   )
