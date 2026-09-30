@@ -181,6 +181,8 @@ No uniqueness constraint on (user_id, period_type, period_identifier) — a sing
 - Token is shown to the user exactly once (at generation, in the app's "Set up voice capture" screen) and never re-displayed — only its hash is stored. Losing it means regenerating (and updating the Shortcut).
 - A pre-built, importable `.shortcut` file is hosted at `/Brain Dump.shortcut` (public/ directory) — built once by hand in the Shortcuts app with a placeholder token value, then hosted directly rather than distributed through Apple's iCloud share flow (which would require an Apple ID signed into automation tooling, not available in this environment).
 - Body: `{ content: string, type?: 'thought' | 'goal' | 'task' }` — `type` defaults to `thought` if omitted.
+- Body also accepts `labels?: string[] | string` — Category names (base or the user's own), matched case-insensitively and written to `entry_categories`. A single string may be newline- or comma-separated, since that's how Shortcuts serializes a multi-select "Choose from List" result into a Text field. Unknown names are skipped (returned as `unmatchedLabels`), not auto-created, so a misheard label can't silently add a custom one.
+- `GET` with the same token header returns `{ labels: string[] }` — the user's available label names, so a Shortcut can offer them in "Choose from List" before dictation.
 
 ---
 

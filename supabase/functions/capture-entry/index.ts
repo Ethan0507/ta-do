@@ -12,8 +12,26 @@ async function sha256Hex(input: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+}
+
+// Labels arrive either as a JSON array (a Shortcuts dictionary field of type
+// Array) or as one Text value, which is how Shortcuts serializes a
+// multi-select "Choose from List" result: items joined by newlines. Commas are
+// accepted too so a label list can be typed by hand.
+function parseLabelNames(raw: unknown): string[] {
+  const parts = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : []
+  const names = parts
+    .filter((part): part is string => typeof part === 'string')
+    .flatMap((part) => part.split(/[\n,]/))
+    .map((name) => name.trim())
+    .filter(Boolean)
+  return [...new Set(names.map((name) => name.toLowerCase()))]
+}
+
 Deno.serve(async (req) => {
-  if (req.method !== 'POST') {
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return new Response('Method not allowed', { status: 405 })
   }
 
@@ -34,14 +52,33 @@ Deno.serve(async (req) => {
     return new Response('Unauthorized', { status: 401 })
   }
 
+  // Base categories (user_id null) plus this user's custom labels — the same
+  // set the app's CategoryPicker offers. Filtered by hand since the
+  // service-role client bypasses RLS.
+  const { data: categories, error: categoriesError } = await supabase
+    .from('categories')
+    .select('id, name')
+    .or(`user_id.is.null,user_id.eq.${profile.id}`)
+    .order('name')
+
+  if (categoriesError) {
+    return json({ error: categoriesError.message }, 500)
+  }
+
+  // GET lists the labels so a Shortcut can offer them in "Choose from List".
+  if (req.method === 'GET') {
+    return json({ labels: categories.map((category) => category.name) })
+  }
+
   const body = await req.json().catch(() => null)
   const content = typeof body?.content === 'string' ? body.content.trim() : ''
   if (!content) {
-    return new Response(JSON.stringify({ error: 'Missing content' }), {
-      status: 400,
-      headers: { 'content-type': 'application/json' },
-    })
+    return json({ error: 'Missing content' }, 400)
   }
+
+  const labelNames = parseLabelNames(body?.labels ?? body?.label)
+  const matched = categories.filter((category) => labelNames.includes(category.name.toLowerCase()))
+  const unmatched = labelNames.filter((name) => !matched.some((category) => category.name.toLowerCase() === name))
 
   const type = body?.type === 'goal' || body?.type === 'task' ? body.type : 'thought'
 
@@ -58,14 +95,21 @@ Deno.serve(async (req) => {
     .single()
 
   if (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'content-type': 'application/json' },
-    })
+    return json({ error: error.message }, 500)
   }
 
-  return new Response(JSON.stringify({ entry: data }), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  })
+  if (matched.length > 0) {
+    const { error: labelError } = await supabase
+      .from('entry_categories')
+      .insert(matched.map((category) => ({ entry_id: data.id, category_id: category.id })))
+    // The entry itself is saved; a labeling failure shouldn't make the
+    // Shortcut report the whole capture as lost.
+    if (labelError) {
+      return json({ entry: data, labels: [], labelError: labelError.message })
+    }
+  }
+
+  // Unknown label names are skipped rather than created, so a misheard or
+  // mistyped label doesn't quietly add a new custom label.
+  return json({ entry: data, labels: matched.map((category) => category.name), unmatchedLabels: unmatched })
 })

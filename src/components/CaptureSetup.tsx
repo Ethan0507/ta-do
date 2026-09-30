@@ -183,6 +183,25 @@ export function CaptureSetup({ userId, onClose }: CaptureSetupProps) {
           </div>
         </details>
 
+        <details className="text-[13px] text-[var(--color-text-muted)]">
+          <summary className="cursor-pointer font-semibold">Label thoughts as you capture them</summary>
+          <div className="mt-2 flex flex-col gap-2">
+            <p>
+              Before the <strong>Dictate Text</strong> action, add a <strong>Get Contents of URL</strong> action with the
+              same URL and token header, Method <strong>GET</strong>. It returns your labels.
+            </p>
+            <p>
+              Add <strong>Get Dictionary Value</strong> for key <code className="rounded bg-black/10 px-1">labels</code>,
+              then <strong>Choose from List</strong> on it (turn on <strong>Select Multiple</strong> to allow several).
+            </p>
+            <p>
+              In the existing POST action's JSON body, add a key <code className="rounded bg-black/10 px-1">labels</code>{' '}
+              set to the <strong>Chosen Item</strong>. Label names are matched ignoring case; names that aren't one of your
+              labels are skipped. Create new labels in the app first.
+            </p>
+          </div>
+        </details>
+
         <button
           type="button"
           onClick={handleRegenerate}

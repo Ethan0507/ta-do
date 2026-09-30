@@ -41,6 +41,7 @@ MVP succeeds if Ethan uses Ta-do **daily for 2 consecutive weeks** as his sole c
 - [x] RLS policies scoping every table by user_id
 - [x] Notes field on Entry (freeform, separate from `content`)
 - [x] First-run onboarding walkthrough for Shortcuts setup, with live capture test
+- [x] Label (category) option in the Shortcuts capture — `labels` in the POST body, plus a GET that lists label names for a "Choose from List" step
 - [x] Multi-line task capture — pasting/typing several lines into the task capture box opens an editable draft-review sheet (edit/remove/add lines) before creating them all together
 
 ## MVP Complete — build after Core, still required to call the MVP done, lower priority
