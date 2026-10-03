@@ -9,7 +9,6 @@ import {
   fetchEntryCategoryIds,
   fetchTodayEntries,
   getTopPosition,
-  getTopPositionsForBatch,
   setGoalStatus,
   setTaskStatus,
   updateEntryPosition,
@@ -22,6 +21,10 @@ import { DailyList } from '../components/DailyList'
 import { CaptureFab } from '../components/CaptureFab'
 import { EntryDetail } from '../components/EntryDetail'
 import { UpcomingTasksSheet } from '../components/UpcomingTasksSheet'
+import { ComposerSheet } from '../components/ComposerSheet'
+import type { ParsedEntry } from '../lib/commands/parser'
+import { cachedPhraseRows, fetchPhraseRows, phrasesFrom } from '../lib/commands/phrases'
+import { saveDrafts } from '../lib/commands/executor'
 import { AccountSettings } from '../components/AccountSettings'
 
 interface HomeProps {
@@ -45,6 +48,12 @@ export function Home({ session, onOpenLibrary, onOpenTemplate, refreshKey, onTim
   const [entryCategoryIds, setEntryCategoryIds] = useState<Record<string, string[]>>({})
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
   const [showUpcoming, setShowUpcoming] = useState(false)
+  const [composerDrafts, setComposerDrafts] = useState<ParsedEntry[] | null>(null)
+  const [phraseRows, setPhraseRows] = useState(cachedPhraseRows)
+
+  useEffect(() => {
+    fetchPhraseRows().then(setPhraseRows).catch(() => {})
+  }, [])
   const [showSettings, setShowSettings] = useState(false)
 
   const reload = useCallback(async () => {
@@ -72,13 +81,6 @@ export function Home({ session, onOpenLibrary, onOpenTemplate, refreshKey, onTim
     await reload()
   }
 
-  async function handleCaptureMany(contents: string[]) {
-    const positions = getTopPositionsForBatch(entries, contents.length)
-    for (let i = 0; i < contents.length; i++) {
-      await createEntry(session.user.id, type, contents[i], null, positions[i])
-    }
-    await reload()
-  }
 
   async function handleCheck(entryId: string) {
     if (type === 'task') await setTaskStatus(entryId, 'done')
@@ -170,7 +172,19 @@ export function Home({ session, onOpenLibrary, onOpenTemplate, refreshKey, onTim
         </div>
       </div>
 
-      <CaptureFab type={type} onCapture={handleCapture} onCaptureMany={handleCaptureMany} />
+      <CaptureFab type={type} phrases={phrasesFrom(phraseRows)} onCapture={handleCapture} onCompose={setComposerDrafts} />
+
+      {composerDrafts && (
+        <ComposerSheet
+          initialDrafts={composerDrafts}
+          defaultType={type}
+          onClose={() => setComposerDrafts(null)}
+          onSave={async (drafts) => {
+            await saveDrafts(drafts, type, session.user.id)
+            await reload()
+          }}
+        />
+      )}
 
       {showUpcoming && (
         <UpcomingTasksSheet onClose={() => setShowUpcoming(false)} onChanged={reload} onOpenEntry={setSelectedEntry} />

@@ -195,6 +195,11 @@ export async function updateEntryDueDate(entryId: string, dueDate: string | null
   if (error) throw error
 }
 
+export async function updateEntryDueTime(entryId: string, dueTime: string | null): Promise<void> {
+  const { error } = await supabase.from('entries').update({ due_time: dueTime }).eq('id', entryId)
+  if (error) throw error
+}
+
 export async function findRecentEntryByContent(content: string, sinceISO: string): Promise<Entry | null> {
   const { data, error } = await supabase
     .from('entries')

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ThemePreference } from '../types'
 import { deviceTimezone, fetchTimezoneSetting, updateTimezoneSetting, type TimezoneSetting } from '../lib/settings'
+import { VoicePhrasesSheet } from './VoicePhrasesSheet'
 
 interface AccountSettingsProps {
   userId: string
@@ -20,6 +21,7 @@ const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
 export function AccountSettings({ userId, themePreference, onThemeChange, onTimezoneChanged, onClose }: AccountSettingsProps) {
   const [timezone, setTimezone] = useState<TimezoneSetting | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showPhrases, setShowPhrases] = useState(false)
   const timezones = useMemo(() => Intl.supportedValuesOf('timeZone'), [])
 
   useEffect(() => {
@@ -122,7 +124,23 @@ export function AccountSettings({ userId, themePreference, onThemeChange, onTime
           )}
           {error && <span className="text-xs font-semibold text-[var(--color-tertiary)]">{error}</span>}
         </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-semibold text-[var(--color-text-muted)]">Voice phrases</span>
+          <button
+            type="button"
+            onClick={() => setShowPhrases(true)}
+            className="flex items-center justify-between rounded-2xl bg-white/45 px-3.5 py-2.5 text-left text-sm font-semibold text-[var(--color-text)]"
+          >
+            <span>See and change command phrases</span>
+            <span className="text-[var(--color-text-faint)]">›</span>
+          </button>
+          <span className="text-[11px] text-[var(--color-text-faint)]">
+            Words like “label as” or “every weekday” that set details when you capture — here and on your iPhone.
+          </span>
+        </div>
       </div>
+      {showPhrases && <VoicePhrasesSheet userId={userId} onClose={() => setShowPhrases(false)} />}
     </>
   )
 }

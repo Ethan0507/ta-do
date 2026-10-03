@@ -7,6 +7,7 @@ import {
   setEntryCategories,
   updateEntryContent,
   updateEntryDueDate,
+  updateEntryDueTime,
   updateEntryNotes,
   updateEntryType,
 } from '../lib/entries'
@@ -40,6 +41,7 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
   const [notes, setNotes] = useState(entry.notes ?? '')
   const [type, setType] = useState<EntryType>(entry.type)
   const [dueDate, setDueDate] = useState(entry.due_date ?? '')
+  const [dueTime, setDueTime] = useState(entry.due_time?.slice(0, 5) ?? '')
   const [rule, setRule] = useState<RecurrenceRule | null>(null)
   const [initialRule, setInitialRule] = useState<RecurrenceRule | null>(null)
   const [template, setTemplate] = useState<Entry | null>(null)
@@ -85,6 +87,7 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
     content.trim() !== entry.content ||
     notes.trim() !== (entry.notes ?? '') ||
     (type === 'task' && !isTemplate && dueDate !== (entry.due_date ?? '')) ||
+    (type === 'task' && !isTemplate && dueTime !== (entry.due_time?.slice(0, 5) ?? '')) ||
     (type === 'task' && !isOccurrence && ruleChanged) ||
     (type === entry.type && type !== 'thought' && isDone !== originalIsDone) ||
     !sameIds(localCategoryIds, categoryIds)
@@ -112,6 +115,8 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
       }
       if (!isTemplate) {
         await updateEntryDueDate(entry.id, dueDate || null)
+        const time = dueDate ? dueTime || null : null
+        if (time !== (entry.due_time?.slice(0, 5) ?? null)) await updateEntryDueTime(entry.id, time)
       }
     } else if (type === 'goal') {
       await setGoalStatus(entry.id, isDone ? 'achieved' : 'ongoing')
@@ -174,12 +179,23 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
         {type === 'task' && !isTemplate && (
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-semibold text-[var(--color-text-muted)]">Due date</span>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-fit rounded-xl border border-[var(--glass-border)] bg-white/45 px-3 py-2 text-sm text-[var(--color-text)]"
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-fit rounded-xl border border-[var(--glass-border)] bg-white/45 px-3 py-2 text-sm text-[var(--color-text)]"
+              />
+              {dueDate && (
+                <input
+                  type="time"
+                  value={dueTime}
+                  onChange={(e) => setDueTime(e.target.value)}
+                  aria-label="Due time"
+                  className="w-fit rounded-xl border border-[var(--glass-border)] bg-white/45 px-3 py-2 text-sm text-[var(--color-text)]"
+                />
+              )}
+            </div>
           </label>
         )}
 

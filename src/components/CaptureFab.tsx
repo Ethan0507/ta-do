@@ -1,12 +1,25 @@
 import { useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react'
 import type { EntryType } from '../types'
-import { BulkTaskDraftSheet } from './BulkTaskDraftSheet'
+import { parseCommands, type CommandPhrase, type ParsedEntry } from '../lib/commands/parser'
 
 interface CaptureFabProps {
   type: EntryType
+  /** The user's command phrases (same as the iOS app's voice phrases). */
+  phrases: CommandPhrase[]
   onCapture: (content: string) => Promise<void>
-  onCaptureMany: (contents: string[]) => Promise<void>
+  /** Opens the shared composer with these drafts. */
+  onCompose: (drafts: ParsedEntry[]) => void
 }
+
+/** Each line is read separately (one entry per line), with the user's phrases. */
+function draftsFrom(text: string, phrases: CommandPhrase[]): ParsedEntry[] {
+  return text
+    .split('\n')
+    .filter((line) => line.trim())
+    .flatMap((line) => parseCommands(line, phrases))
+}
+
+const isPlain = (d: ParsedEntry) => !d.type && !d.labels.length && !d.dueDate && !d.repeatRule && !d.note
 
 const TYPE_LABEL: Record<EntryType, string> = {
   thought: 'thought',
@@ -14,11 +27,10 @@ const TYPE_LABEL: Record<EntryType, string> = {
   goal: 'goal',
 }
 
-export function CaptureFab({ type, onCapture, onCaptureMany }: CaptureFabProps) {
+export function CaptureFab({ type, phrases, onCapture, onCompose }: CaptureFabProps) {
   const [open, setOpen] = useState(false)
   const [content, setContent] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [draftLines, setDraftLines] = useState<string[] | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -46,18 +58,12 @@ export function CaptureFab({ type, onCapture, onCaptureMany }: CaptureFabProps) 
     e.preventDefault()
     if (!content.trim()) return
 
-    if (type === 'task') {
-      const lines = content
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-      if (lines.length > 1) {
-        setDraftLines(lines)
-        setContent('')
-        resetTextareaHeight()
-        setOpen(false)
-        return
-      }
+    // Same rule as the iOS app: a plain single line saves instantly; several lines or any
+    // command phrases (dates, labels, repeats…) open the composer to review.
+    const drafts = draftsFrom(content, phrases)
+    if (!(drafts.length === 1 && isPlain(drafts[0]))) {
+      openComposer(drafts)
+      return
     }
 
     setSubmitting(true)
@@ -68,9 +74,11 @@ export function CaptureFab({ type, onCapture, onCaptureMany }: CaptureFabProps) 
     setOpen(false)
   }
 
-  async function handleConfirmMany(contents: string[]) {
-    await onCaptureMany(contents)
-    setDraftLines(null)
+  function openComposer(drafts: ParsedEntry[]) {
+    onCompose(drafts)
+    setContent('')
+    resetTextareaHeight()
+    setOpen(false)
   }
 
   return (
@@ -111,7 +119,22 @@ export function CaptureFab({ type, onCapture, onCaptureMany }: CaptureFabProps) 
               </button>
             </div>
 
-            <span className="text-[12.5px] font-bold text-[var(--color-primary)]">New {TYPE_LABEL[type]}</span>
+            <div className="flex items-center justify-between">
+              <span className="text-[12.5px] font-bold text-[var(--color-primary)]">New {TYPE_LABEL[type]}</span>
+              <button
+                type="button"
+                onClick={() => openComposer(content.trim() ? draftsFrom(content, phrases) : [])}
+                className="flex items-center gap-1.5 rounded-full bg-white/45 px-3 py-1 text-xs font-bold text-[var(--color-primary)]"
+                title="Date, repeat, labels and note"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+                  <circle cx="16" cy="7" r="2" />
+                  <circle cx="10" cy="17" r="2" />
+                </svg>
+                Options
+              </button>
+            </div>
 
             <div className="flex items-end gap-3">
               {type === 'task' ? (
@@ -149,9 +172,6 @@ export function CaptureFab({ type, onCapture, onCaptureMany }: CaptureFabProps) 
         </>
       )}
 
-      {draftLines && (
-        <BulkTaskDraftSheet initialLines={draftLines} onClose={() => setDraftLines(null)} onConfirm={handleConfirmMany} />
-      )}
     </>
   )
 }
