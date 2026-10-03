@@ -1,0 +1,40 @@
+# Generates TaDo.xcodeproj — run `xcodegen` in this folder after changing it.
+name: TaDo
+options:
+  bundleIdPrefix: com.ethanpalani
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    from: 2.20.0
+targets:
+  TaDo:
+    type: application
+    platform: iOS
+    sources:
+      - TaDo
+    dependencies:
+      - package: Supabase
+    info:
+      path: TaDo/Info.plist
+      properties:
+        CFBundleDisplayName: Ta-do
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        # Same tint as the app background, so launch doesn't flash white.
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Sign-in (magic link + Google) returns to the app via tado://auth-callback.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.ethanpalani.TaDo.auth
+            CFBundleURLSchemes: [tado]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ethanpalani.TaDo
+        SWIFT_VERSION: "5.10"
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic

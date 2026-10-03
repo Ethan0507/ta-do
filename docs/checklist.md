@@ -95,13 +95,18 @@ Goal: very few bugs, ideally none. Start by collecting concrete repro cases and 
 
 ### Phase 2 — Native app: iOS first, then Android
 Purpose: easier, hassle-free capture with more power than the current Shortcut. Web app stays the main UI.
-- [ ] Pick a stack (cross-platform so Android reuses the iOS work, vs. separate native codebases) and install tooling — this machine currently has no Xcode or Android Studio, only Command Line Tools
-- [ ] Auth shared with the existing Supabase project (same accounts, same RLS)
-- [ ] Voice capture with **custom trigger phrases**
-- [ ] Voice commands to set type (Task / Thought / Goal), labels/categories, due date/time, and other config at capture time
-- [ ] Push notifications / reminders on selected tasks (needs a per-task reminder field + server-side sender)
-- [ ] Ship iOS
-- [ ] Android version
+
+**Decisions (2026-10-03):** native **Swift / SwiftUI** (Android later as its own Kotlin app); "custom phrase" = a **Siri phrase that starts capture**; **no paid Apple Developer account** for now → reminders are local notifications scheduled on the phone, installs on Ethan's iPhone are free 7-day provisioning, no TestFlight or server push yet. App lives in `ios/` in this repo; Xcode project generated from `project.yml` via XcodeGen. Talks to the same Supabase project (same accounts, same RLS) via `supabase-swift`.
+
+- [x] 2.0 Setup — Xcode 27 + iOS 27 simulator runtime, XcodeGen, `tado://auth-callback` allowed in Supabase Auth. Setup steps in `ios/README.md`
+- [x] 2.1 Skeleton + sign-in — SwiftUI app, magic link + Google sign-in, session kept in Keychain, timezone sync + today's repeats like the web app. Verified in the simulator: Google sign-in returns to the app, session survives a restart (magic link not yet tried end to end)
+- [x] 2.2 Home + capture — Thoughts / Tasks / Goals lists using the same rules and queries as the web Home (generated tasks, overdue, missed), capture panel (several lines → several tasks), swipe right = done / left = archive, completed-today strip, detail sheet (text, type, due date, done, notes, archive). Styled after the web app's glass design with native controls (sheets, menus, swipe actions, haptics), light + dark, app icon from the logomark. Verified in the simulator against live data. Not yet on iOS: Library, repeat setup, categories, drag-to-reorder (web only for now)
+- [ ] 2.3 In-app voice capture — dictation button using on-device speech recognition
+- [ ] 2.4 Siri + Shortcuts — "Capture in Ta-do" App Intent with optional type, label(s) and due date (Siri asks follow-ups); built-in App Shortcut phrase (must contain the app name, e.g. "Brain dump in Ta-do") plus a ready-made Shortcut for a fully custom phrase; lock screen / Action button control
+- [ ] 2.5 Reminders — per-task reminder time (schema change), local notifications scheduled after each sync; repeating tasks with a time remind at that time
+- [ ] 2.6 On-device install via free provisioning; use it for a week
+- [ ] 2.7 Android (Kotlin) — plan separately once iOS has settled
+- [ ] Later, once a paid Apple account exists: TestFlight, server push
 
 ### Phase 3 — Goals: link Tasks to Goals for progress insights
 Absorbs the remaining MVP Complete items, planned together since they all feed goal progress.
@@ -122,13 +127,18 @@ Absorbs the remaining MVP Complete items, planned together since they all feed g
 - [ ] Upkeep cost — estimate Supabase / Vercel / push / email costs per user and at 50 and 200 users; set up custom SMTP
 - [ ] Realtime sync verified for concurrent use (see Multi-User)
 
-### Phase 6 — Trial users (friend circle)
+### Phase 6 — End-to-end design UI/UX review (before anyone else uses it)
+- [ ] Walk every flow on web and iOS end to end (sign-up, onboarding, capture incl. voice/Siri, Home, Library, detail sheets, repeats, goals, analytics, settings) and list UX friction, inconsistencies and visual issues
+- [ ] Prioritise the findings and make the changes
+- [ ] Re-check both platforms after the changes
+
+### Phase 7 — Trial users (friend circle)
 - [ ] Onboard a handful of friends, collect feedback, fix what breaks
 
-### Phase 7 — Alpha users (first- and second-degree circle, ~50 users)
+### Phase 8 — Alpha users (first- and second-degree circle, ~50 users)
 - [ ] Onboarding + feedback channel that works without hand-holding
 
-### Phase 8 — Beta users (~100–200 users)
+### Phase 9 — Beta users (~100–200 users)
 - [ ] Scale up from Alpha learnings
 
 ## Standard App Essentials
