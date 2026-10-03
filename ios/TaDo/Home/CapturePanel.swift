@@ -30,6 +30,8 @@ struct CapturePanel: View {
     let onSubmit: (String) async -> Bool
     let onClose: () -> Void
     var onVoice: () -> Void = {}
+    /// Opens the full composer (date, repeat, labels, note…) with what's typed so far.
+    var onOptions: (String) -> Void = { _ in }
     @State private var text = ""
     @State private var sending = false
     @FocusState private var focused: Bool
@@ -43,6 +45,17 @@ struct CapturePanel: View {
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Theme.primary)
                 Spacer()
+                Button {
+                    onOptions(text)
+                } label: {
+                    Label("Options", systemImage: "slider.horizontal.3")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.primary)
+                        .padding(.horizontal, 10)
+                        .frame(height: 30)
+                        .background(Theme.field, in: Capsule())
+                }
+                .accessibilityHint("Date, repeat, labels and note")
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .bold))

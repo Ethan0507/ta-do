@@ -100,6 +100,9 @@ struct GlassIconButton: View {
                 .frame(width: 36, height: 36)
                 .glassCard(cornerRadius: 18)
         }
+        // Borderless keeps each button's tap separate when several share a List row
+        // (with the default style, iOS fires one button for a tap anywhere in the row).
+        .buttonStyle(.borderless)
         .accessibilityLabel(label)
     }
 }

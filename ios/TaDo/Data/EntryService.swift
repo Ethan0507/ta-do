@@ -104,7 +104,8 @@ enum EntryService {
         (entries.first?.position ?? positionGap) - positionGap
     }
 
-    static func create(userID: UUID, type: EntryType, content: String, position: Double) async throws {
+    @discardableResult
+    static func create(userID: UUID, type: EntryType, content: String, position: Double) async throws -> Entry {
         let row: [String: AnyJSON] = [
             "user_id": .string(userID.uuidString),
             "type": .string(type.rawValue),
@@ -113,7 +114,11 @@ enum EntryService {
             "task_status": type == .task ? .string("open") : .null,
             "goal_status": type == .goal ? .string("ongoing") : .null,
         ]
-        try await supabase.from("entries").insert(row).execute()
+        return try await supabase.from("entries").insert(row).select().single().execute().value
+    }
+
+    static func setDueTime(_ id: UUID, _ time: String?) async throws {
+        try await update(id, ["due_time": time.map { .string($0) } ?? .null])
     }
 
     static func setDone(_ entry: Entry, _ done: Bool) async throws {

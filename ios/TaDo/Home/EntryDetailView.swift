@@ -18,6 +18,7 @@ struct EntryDetailView: View {
     @State private var type: EntryType
     @State private var hasDueDate: Bool
     @State private var dueDate: Date
+    @State private var dueTime: String?
     @State private var done: Bool
     @State private var rule: RecurrenceRule?
     @State private var initialRule: RecurrenceRule?
@@ -41,6 +42,7 @@ struct EntryDetailView: View {
         _type = State(initialValue: entry.type)
         _hasDueDate = State(initialValue: entry.dueDate != nil)
         _dueDate = State(initialValue: entry.dueDate.flatMap(Self.parse) ?? Date())
+        _dueTime = State(initialValue: entry.dueTime.map { String($0.prefix(5)) })
         _done = State(initialValue: entry.isDone)
     }
 
@@ -70,6 +72,13 @@ struct EntryDetailView: View {
                                 Toggle("Due date", isOn: $hasDueDate)
                                 if hasDueDate {
                                     DatePicker("Date", selection: $dueDate, displayedComponents: .date)
+                                    Toggle("Time", isOn: Binding(get: { dueTime != nil }, set: { dueTime = $0 ? "09:00" : nil }))
+                                    if let time = dueTime {
+                                        DatePicker("At", selection: Binding(
+                                            get: { DueDateEditor.date(from: time) },
+                                            set: { dueTime = DueDateEditor.string(from: $0) }
+                                        ), displayedComponents: .hourAndMinute)
+                                    }
                                 }
                             }
                         }
@@ -171,6 +180,8 @@ struct EntryDetailView: View {
             if type == .task, !isTemplate {
                 let newDue = hasDueDate ? Self.format(dueDate) : nil
                 if newDue != entry.dueDate { try await EntryService.setDueDate(entry, newDue) }
+                let newTime = hasDueDate ? dueTime : nil
+                if newTime != entry.dueTime.map({ String($0.prefix(5)) }) { try await EntryService.setDueTime(entry.id, newTime) }
             }
             if trimmed != entry.content || trimmedNotes != (entry.notes ?? "") {
                 try await EntryService.setContent(entry, content: trimmed, notes: trimmedNotes)

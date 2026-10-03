@@ -51,6 +51,18 @@ struct SettingsView: View {
                         Text("Decides when your day starts — repeating tasks are created at midnight in this timezone.")
                     }
 
+                    Section {
+                        NavigationLink {
+                            VoicePhrasesView(userID: user.id)
+                        } label: {
+                            Label("Voice phrases", systemImage: "waveform")
+                        }
+                    } header: {
+                        Text("Voice")
+                    } footer: {
+                        Text("See and change the words that set type, labels, repeats and more when you capture by voice or Siri.")
+                    }
+
                     Section("Account") {
                         Text(user.email ?? user.id.uuidString)
                         Button("Sign out", role: .destructive) {

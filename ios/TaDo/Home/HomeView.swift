@@ -14,7 +14,8 @@ struct HomeView: View {
     @State private var showUpcoming = false
     @State private var capturing = false
     @State private var voiceCapturing = false
-    @State private var bulkLines: [String]?
+    /// Drafts open in the shared composer sheet (typed capture with options).
+    @State private var composer: ComposerDrafts?
     /// Reorder mode shows the list's drag handles (the web shows a handle on every row).
     @State private var editMode: EditMode = .inactive
     @Environment(\.scenePhase) private var scenePhase
@@ -49,11 +50,12 @@ struct HomeView: View {
             if phase == .active { Task { await model.prepareAndLoad() } }
         }
         .fullScreenCover(isPresented: $voiceCapturing) {
-            VoiceCaptureView(initialType: router.voiceCaptureType ?? model.type) { text, type in
-                await model.capture(text, as: type)
+            VoiceCaptureView(initialType: router.voiceCaptureType ?? model.type, prefill: router.voiceCapturePrefill) { entries, type in
+                await model.saveParsed(entries, defaultType: type)
             } onClose: {
                 voiceCapturing = false
                 router.voiceCaptureType = nil
+                router.voiceCapturePrefill = nil
             }
         }
         .onChange(of: router.voiceCaptureRequested, initial: true) { _, requested in
@@ -72,19 +74,16 @@ struct HomeView: View {
         .sheet(isPresented: $showUpcoming) {
             UpcomingTasksSheet(userID: user.id, onChanged: { await model.load() }, onOpenTemplate: openTemplate)
         }
-        .sheet(item: Binding(
-            get: { bulkLines.map { BulkLines(lines: $0) } },
-            set: { bulkLines = $0?.lines }
-        )) { bulk in
-            BulkTaskReviewSheet(lines: bulk.lines) { lines in
-                await model.capture(lines.joined(separator: "\n"), as: .task)
+        .sheet(item: $composer) { item in
+            EntryComposerSheet(drafts: item.drafts, defaultType: model.type) { entries in
+                await model.saveParsed(entries, defaultType: model.type)
             }
         }
     }
 
-    private struct BulkLines: Identifiable {
+    struct ComposerDrafts: Identifiable {
         let id = UUID()
-        let lines: [String]
+        let drafts: [ParsedEntry]
     }
 
     /// "Edit repeating task": close whatever sheet is open and show the template in Library.
@@ -204,6 +203,10 @@ struct HomeView: View {
                 } onVoice: {
                     capturing = false
                     voiceCapturing = true
+                } onOptions: { text in
+                    capturing = false
+                    let drafts = drafts(from: text)
+                    composer = ComposerDrafts(drafts: drafts.isEmpty ? [ParsedEntry(content: "")] : drafts)
                 }
                 .transition(.move(edge: .bottom))
             }
@@ -211,18 +214,24 @@ struct HomeView: View {
         .foregroundStyle(Theme.text)
     }
 
-    /// Several lines in the task box open the review sheet, like the web; otherwise save.
+    /// Typed capture reads voice phrases too. A plain single line saves instantly (fast
+    /// capture); several lines or anything with commands opens the composer to review.
     private func submitCapture(_ text: String) async -> Bool {
-        if model.type == .task {
-            let lines = text.split(whereSeparator: \.isNewline)
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-                .filter { !$0.isEmpty }
-            if lines.count > 1 {
-                bulkLines = lines
-                return true
-            }
+        let drafts = drafts(from: text)
+        let plain = drafts.count == 1 && drafts[0].type == nil && drafts[0].labels.isEmpty
+            && drafts[0].dueDate == nil && drafts[0].repeatRule == nil && drafts[0].note == nil
+        if plain {
+            return await model.capture(text)
         }
-        return await model.capture(text)
+        guard !drafts.isEmpty else { return true }
+        composer = ComposerDrafts(drafts: drafts)
+        return true
+    }
+
+    /// Each line is read separately (one task per line), using the user's voice phrases.
+    private func drafts(from text: String) -> [ParsedEntry] {
+        let parser = PhraseStore.shared.parser()
+        return text.split(whereSeparator: \.isNewline).flatMap { parser.parse(String($0)) }
     }
 
     private var header: some View {

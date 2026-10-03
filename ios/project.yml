@@ -52,3 +52,20 @@ targets:
         CODE_SIGN_STYLE: Automatic
         # Ethan's free Personal Team — installs on his own iPhone, expire after 7 days.
         DEVELOPMENT_TEAM: R339XDW4V8
+    scheme:
+      testTargets:
+        - TaDoTests
+  TaDoTests:
+    type: bundle.unit-test
+    platform: iOS
+    # The parser is plain Foundation code, so it's compiled straight into the tests —
+    # no app host to launch, and the suite runs in seconds.
+    sources:
+      - TaDoTests
+      - TaDo/Voice/CommandParser.swift
+      - TaDo/Data/Models.swift
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        DEVELOPMENT_TEAM: R339XDW4V8
+        SWIFT_VERSION: "5.10"

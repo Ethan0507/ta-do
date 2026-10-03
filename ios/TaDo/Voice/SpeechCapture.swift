@@ -48,6 +48,15 @@ final class SpeechCapture {
         volatile = ""
         phase = .preparing
 
+        #if DEBUG
+        // Test hook: pretend this was said (the simulator can't run on-device speech).
+        if let said = ProcessInfo.processInfo.environment["TADO_VOICE_TEST_TRANSCRIPT"] {
+            finalized = said
+            phase = .done
+            return
+        }
+        #endif
+
         guard await Self.requestPermissions() else {
             phase = .permissionDenied
             return

@@ -4,20 +4,24 @@ import SwiftUI
 /// The review step is where 2.4's command parsing will show what it understood.
 struct VoiceCaptureView: View {
     let initialType: EntryType
+    /// Already-said words to review straight away instead of listening (Siri's "Edit in Ta-do").
+    var prefill: String?
     /// Returns false if saving failed.
-    let onSave: (String, EntryType) async -> Bool
+    let onSave: ([ParsedEntry], EntryType) async -> Bool
     let onClose: () -> Void
 
     @State private var speech = SpeechCapture()
     @State private var text = ""
-    @State private var type: EntryType
-    @State private var saving = false
+    @State private var parsed: [ParsedEntry] = []
+    @State private var editingTranscript = false
+    @State private var reviewingPrefill = false
+    private var parser: CommandParser { PhraseStore.shared.parser() }
 
-    init(initialType: EntryType, onSave: @escaping (String, EntryType) async -> Bool, onClose: @escaping () -> Void) {
+    init(initialType: EntryType, prefill: String? = nil, onSave: @escaping ([ParsedEntry], EntryType) async -> Bool, onClose: @escaping () -> Void) {
         self.initialType = initialType
+        self.prefill = prefill
         self.onSave = onSave
         self.onClose = onClose
-        _type = State(initialValue: initialType)
     }
 
     var body: some View {
@@ -38,6 +42,8 @@ struct VoiceCaptureView: View {
                 }
 
                 switch speech.phase {
+                case _ where reviewingPrefill:
+                    review
                 case .done:
                     review
                 case .permissionDenied:
@@ -52,9 +58,21 @@ struct VoiceCaptureView: View {
             .padding(.top, 8)
         }
         .foregroundStyle(Theme.text)
-        .task { await speech.start() }
+        .task {
+            if let prefill, !prefill.isEmpty {
+                text = prefill
+                parsed = parser.parse(prefill)
+                reviewingPrefill = true
+            } else {
+                await speech.start()
+            }
+        }
         .onChange(of: speech.phase) { _, phase in
-            if phase == .done { text = speech.transcript }
+            if phase == .done {
+                text = speech.transcript
+                parsed = parser.parse(text)
+                if parsed.isEmpty { parsed = [ParsedEntry(content: "")] } // nothing heard: type it
+            }
         }
         .sensoryFeedback(.start, trigger: speech.phase == .listening)
         .sensoryFeedback(.stop, trigger: speech.phase == .done)
@@ -114,54 +132,58 @@ struct VoiceCaptureView: View {
     // MARK: Review
 
     private var review: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Here's what I heard")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Theme.primary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                // What was heard — tap to fix a misheard word; the entries re-read as you type.
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("You said").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.primary)
+                    if editingTranscript {
+                        TextField("Type it instead", text: $text, axis: .vertical)
+                            .lineLimit(1...6)
+                            .onChange(of: text) { parsed = parser.parse(text) }
+                    } else {
+                        Button {
+                            editingTranscript = true
+                        } label: {
+                            HStack(alignment: .top) {
+                                Text(text.isEmpty ? "Nothing heard — tap to type" : "“\(text)”")
+                                    .multilineTextAlignment(.leading)
+                                    .foregroundStyle(Theme.textMuted)
+                                Spacer()
+                                Image(systemName: "pencil").foregroundStyle(Theme.textFaint)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .font(.system(size: 14))
 
-            TextField("Nothing heard — type it instead", text: $text, axis: .vertical)
-                .lineLimit(2...8)
-                .font(.system(size: 18, weight: .medium))
-                .padding(16)
-                .background(Theme.field, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.primary, lineWidth: 1.5)
+                ComposerList(drafts: $parsed, defaultType: initialType) { entries in
+                    let saved = await onSave(entries, initialType)
+                    if saved { onClose() }
+                    return saved
                 }
 
-            HStack {
-                TypeMenu(selection: $type)
-                Spacer()
-            }
-
-            HStack(spacing: 12) {
                 Button {
+                    editingTranscript = false
+                    reviewingPrefill = false
                     Task { await speech.start() }
                 } label: {
-                    Label("Again", systemImage: "mic")
-                        .font(.system(size: 15, weight: .semibold))
+                    Label("Say it again", systemImage: "mic")
+                        .font(.system(size: 14, weight: .semibold))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, 12)
                         .background(Theme.field, in: Capsule())
                         .overlay { Capsule().strokeBorder(Theme.glassBorder) }
                 }
-                Button(action: save) {
-                    Text("Save \(type.rawValue)")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Theme.primaryOn)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Theme.primary, in: Capsule())
-                }
-                .disabled(saving || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .opacity(saving || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.6 : 1)
+                .buttonStyle(.plain)
             }
-            Spacer()
+            .padding(.top, 24)
         }
-        .padding(20)
-        .glassCard(cornerRadius: 24, strong: true)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .padding(.top, 40)
+        .scrollDismissesKeyboard(.interactively)
     }
+
+
 
     private func failure(_ message: String, showSettings: Bool) -> some View {
         VStack(spacing: 16) {
@@ -185,11 +207,4 @@ struct VoiceCaptureView: View {
         }
     }
 
-    private func save() {
-        saving = true
-        Task {
-            if await onSave(text, type) { onClose() }
-            saving = false
-        }
-    }
 }

@@ -24,12 +24,14 @@ final class HomeModel {
         // runs alongside and the list refreshes once it lands.
         async let prepared: String? = try? DayService.prepareDay(userID: userID)
         async let settingsLoaded: Void = AppSettings.shared.load(userID: userID)
+        async let phrasesLoaded: Void = PhraseStore.shared.load()
         await load()
         if let zone = await prepared {
             timezone = zone
             await load()
         }
         await settingsLoaded
+        await phrasesLoaded
     }
 
     func load() async {
@@ -91,6 +93,20 @@ final class HomeModel {
         entries = reordered
         do { try await EntryService.setPosition(moved.id, position) } catch { self.error = error.localizedDescription }
         await load()
+    }
+
+    /// Saves entries understood from voice commands (type, dates, labels, repeats…).
+    @discardableResult
+    func saveParsed(_ entries: [ParsedEntry], defaultType: EntryType) async -> Bool {
+        do {
+            try await CommandExecutor.save(entries, defaultType: defaultType, userID: userID)
+            await load()
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            await load()
+            return false
+        }
     }
 
     func setDone(_ entry: Entry, _ done: Bool) async {

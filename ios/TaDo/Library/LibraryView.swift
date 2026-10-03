@@ -114,6 +114,7 @@ struct LibraryView: View {
             } label: {
                 chip(typeFilter?.plural ?? "All types")
             }
+            .buttonStyle(.borderless)
             Menu {
                 Picker("Sort", selection: $sort) {
                     ForEach(Sort.allCases) { Text($0.rawValue).tag($0) }
@@ -121,6 +122,7 @@ struct LibraryView: View {
             } label: {
                 chip(sort.rawValue)
             }
+            .buttonStyle(.borderless)
             Spacer()
             Toggle("Archived", isOn: $showArchived)
                 .font(.system(size: 12, weight: .semibold))
