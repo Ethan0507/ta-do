@@ -3,7 +3,7 @@ name: TaDo
 options:
   bundleIdPrefix: com.ethanpalani
   deploymentTarget:
-    iOS: "17.0"
+    iOS: "26.0"
   createIntermediateGroups: true
 packages:
   Supabase:
@@ -27,7 +27,19 @@ targets:
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
-        # Sign-in (magic link + Google) returns to the app via tado://auth-callback.
+        # Siri hears "Ta-do" as "to do" and confuses it with Notes/Reminders; alternative
+        # names (with pronunciation hints) let Siri phrases match the app unambiguously.
+        INAlternativeAppNames:
+          - INAlternativeAppName: Tah-doh
+            INAlternativeAppNamePronunciationHint: tah doh
+          - INAlternativeAppName: Tado
+            INAlternativeAppNamePronunciationHint: tah doe
+          - INAlternativeAppName: Ta-do app
+            INAlternativeAppNamePronunciationHint: tah doh app
+        NSMicrophoneUsageDescription: Ta-do listens while you capture a thought, task or goal by voice.
+        NSSpeechRecognitionUsageDescription: Ta-do uses Apple's speech recognition to turn what you say into a thought, task or goal.
+        # Sign-in (magic link + Google) returns to the app via tado://auth-callback;
+        # tado://capture opens straight into voice capture.
         CFBundleURLTypes:
           - CFBundleURLName: com.ethanpalani.TaDo.auth
             CFBundleURLSchemes: [tado]
@@ -38,3 +50,5 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_STYLE: Automatic
+        # Ethan's free Personal Team — installs on his own iPhone, expire after 7 days.
+        DEVELOPMENT_TEAM: R339XDW4V8

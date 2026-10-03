@@ -1,16 +1,28 @@
 import SwiftUI
 import Supabase
 
-/// Home — the web Home in native form: glass header, type pill, "completed today" strip,
-/// Today list of glass rows with native swipe actions, and a capture "+" button.
+/// Home — the web Home in native form: glass header (library, settings), type pill,
+/// "completed today" strip, Today list with swipe actions and drag-to-reorder,
+/// "Show upcoming tasks", and the capture "+" (hold for voice).
 struct HomeView: View {
     let user: User
     @State private var model: HomeModel
+    @State private var path: [Route] = []
     @State private var selected: Entry?
     @State private var showSettings = false
     @State private var showCompleted = false
+    @State private var showUpcoming = false
     @State private var capturing = false
+    @State private var voiceCapturing = false
+    @State private var bulkLines: [String]?
+    /// Reorder mode shows the list's drag handles (the web shows a handle on every row).
+    @State private var editMode: EditMode = .inactive
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(AppRouter.self) private var router
+
+    enum Route: Hashable {
+        case library(initial: Entry?)
+    }
 
     init(user: User) {
         self.user = user
@@ -18,26 +30,102 @@ struct HomeView: View {
     }
 
     var body: some View {
+        NavigationStack(path: $path) {
+            home
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(for: Route.self) { route in
+                    switch route {
+                    case .library(let initial):
+                        LibraryView(userID: user.id, initialEntry: initial)
+                            .onDisappear { Task { await model.load() } }
+                    }
+                }
+        }
+        .tint(Theme.primary)
+        .sensoryFeedback(.success, trigger: model.completed.count)
+        .task(id: user.id) { await model.prepareAndLoad() }
+        .onChange(of: model.type) { Task { await model.load() } }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await model.prepareAndLoad() } }
+        }
+        .fullScreenCover(isPresented: $voiceCapturing) {
+            VoiceCaptureView(initialType: router.voiceCaptureType ?? model.type) { text, type in
+                await model.capture(text, as: type)
+            } onClose: {
+                voiceCapturing = false
+                router.voiceCaptureType = nil
+            }
+        }
+        .onChange(of: router.voiceCaptureRequested, initial: true) { _, requested in
+            guard requested else { return }
+            router.voiceCaptureRequested = false
+            selected = nil
+            capturing = false
+            voiceCapturing = true
+        }
+        .sheet(item: $selected) { entry in
+            EntryDetailView(entry: entry, userID: user.id, onChanged: { await model.load() }, onOpenTemplate: openTemplate)
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(user: user) { await model.prepareAndLoad() }
+        }
+        .sheet(isPresented: $showUpcoming) {
+            UpcomingTasksSheet(userID: user.id, onChanged: { await model.load() }, onOpenTemplate: openTemplate)
+        }
+        .sheet(item: Binding(
+            get: { bulkLines.map { BulkLines(lines: $0) } },
+            set: { bulkLines = $0?.lines }
+        )) { bulk in
+            BulkTaskReviewSheet(lines: bulk.lines) { lines in
+                await model.capture(lines.joined(separator: "\n"), as: .task)
+            }
+        }
+    }
+
+    private struct BulkLines: Identifiable {
+        let id = UUID()
+        let lines: [String]
+    }
+
+    /// "Edit repeating task": close whatever sheet is open and show the template in Library.
+    private func openTemplate(_ template: Entry) {
+        selected = nil
+        showUpcoming = false
+        Task {
+            try? await Task.sleep(for: .milliseconds(350)) // let the sheet finish dismissing
+            path = [.library(initial: template)]
+        }
+    }
+
+    private var home: some View {
         ZStack(alignment: .bottomTrailing) {
             GlassBackdrop()
 
             List {
-                header
-                    .plainRow(top: 8, bottom: 6)
+                header.plainRow(top: 8, bottom: 6)
 
-                TypeMenu(selection: $model.type)
-                    .plainRow(top: 8, bottom: 8)
+                TypeMenu(selection: $model.type).plainRow(top: 8, bottom: 8)
 
                 if !model.completed.isEmpty {
-                    completedStrip
-                        .plainRow(top: 8, bottom: 4)
+                    completedStrip.plainRow(top: 8, bottom: 4)
                 }
 
-                Text("TODAY")
-                    .font(.system(size: 11.5, weight: .bold))
-                    .tracking(0.6)
-                    .foregroundStyle(Theme.textMuted)
-                    .plainRow(top: 10, bottom: 0)
+                HStack {
+                    Text("TODAY")
+                        .font(.system(size: 11.5, weight: .bold))
+                        .tracking(0.6)
+                        .foregroundStyle(Theme.textMuted)
+                    Spacer()
+                    if model.entries.count > 1 {
+                        Button(editMode.isEditing ? "Done" : "Reorder") {
+                            withAnimation { editMode = editMode.isEditing ? .inactive : .active }
+                        }
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(Theme.primary)
+                        .buttonStyle(.plain)
+                    }
+                }
+                .plainRow(top: 10, bottom: 0)
 
                 if model.loaded && model.entries.isEmpty {
                     emptyState.plainRow(top: 24, bottom: 0)
@@ -66,6 +154,18 @@ struct HomeView: View {
                             .tint(.gray)
                         }
                 }
+                .onMove { source, destination in
+                    Task { await model.move(from: source, to: destination) }
+                }
+
+                if model.type == .task && model.loaded && model.entries.isEmpty {
+                    Button("Show upcoming tasks") { showUpcoming = true }
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.primary)
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.plain)
+                        .plainRow(top: 16, bottom: 0)
+                }
 
                 if let error = model.error {
                     Text(error).font(.footnote).foregroundStyle(.red).plainRow(top: 8, bottom: 8)
@@ -76,13 +176,19 @@ struct HomeView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            .environment(\.editMode, $editMode)
             .refreshable { await model.prepareAndLoad() }
+            .onChange(of: model.type) { editMode = .inactive }
 
             if !capturing {
-                CaptureFab { withAnimation(.snappy) { capturing = true } }
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 12)
-                    .transition(.scale.combined(with: .opacity))
+                CaptureFab {
+                    withAnimation(.snappy) { capturing = true }
+                } onLongPress: {
+                    voiceCapturing = true
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 12)
+                .transition(.scale.combined(with: .opacity))
             }
 
             if capturing {
@@ -92,26 +198,31 @@ struct HomeView: View {
                     .onTapGesture { withAnimation(.snappy) { capturing = false } }
                     .transition(.opacity)
                 CapturePanel(type: model.type) { text in
-                    await model.capture(text)
+                    await submitCapture(text)
                 } onClose: {
                     withAnimation(.snappy) { capturing = false }
+                } onVoice: {
+                    capturing = false
+                    voiceCapturing = true
                 }
                 .transition(.move(edge: .bottom))
             }
         }
         .foregroundStyle(Theme.text)
-        .sensoryFeedback(.success, trigger: model.completed.count)
-        .task(id: user.id) { await model.prepareAndLoad() }
-        .onChange(of: model.type) { Task { await model.load() } }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await model.prepareAndLoad() } }
+    }
+
+    /// Several lines in the task box open the review sheet, like the web; otherwise save.
+    private func submitCapture(_ text: String) async -> Bool {
+        if model.type == .task {
+            let lines = text.split(whereSeparator: \.isNewline)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            if lines.count > 1 {
+                bulkLines = lines
+                return true
+            }
         }
-        .sheet(item: $selected) { entry in
-            EntryDetailView(entry: entry) { await model.load() }
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView(user: user, timezone: model.timezone)
-        }
+        return await model.capture(text)
     }
 
     private var header: some View {
@@ -119,7 +230,8 @@ struct HomeView: View {
             Logomark(size: 26)
             Text("Ta-do").font(.display(19))
             Spacer()
-            GlassIconButton(systemImage: "gearshape", label: "Settings") { showSettings = true }
+            GlassIconButton(systemImage: "calendar", label: "Open library") { path = [.library(initial: nil)] }
+            GlassIconButton(systemImage: "gearshape", label: "Account settings") { showSettings = true }
         }
     }
 

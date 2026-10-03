@@ -3,6 +3,8 @@ import SwiftUI
 /// The web's round purple "+" button.
 struct CaptureFab: View {
     let action: () -> Void
+    /// Long-press goes straight to voice capture.
+    var onLongPress: () -> Void = {}
 
     var body: some View {
         Button(action: action) {
@@ -14,7 +16,9 @@ struct CaptureFab: View {
                 .background(Circle().fill(Theme.glassFill).padding(-6))
                 .shadow(color: Theme.primary.opacity(0.45), radius: 13, y: 10)
         }
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in onLongPress() })
         .accessibilityLabel("Capture")
+        .accessibilityHint("Hold to capture by voice")
     }
 }
 
@@ -25,6 +29,7 @@ struct CapturePanel: View {
     /// Returns false if saving failed.
     let onSubmit: (String) async -> Bool
     let onClose: () -> Void
+    var onVoice: () -> Void = {}
     @State private var text = ""
     @State private var sending = false
     @FocusState private var focused: Bool
@@ -49,17 +54,21 @@ struct CapturePanel: View {
             }
 
             HStack(alignment: .bottom, spacing: 12) {
-                // Tasks: several lines become several tasks. Others submit on Return.
-                TextField(
-                    type == .task ? "What's on your mind? One task per line to add several at once." : "What's on your mind?",
-                    text: $text,
-                    axis: .vertical
-                )
-                .lineLimit(1...(type == .task ? 6 : 4))
+                // Tasks: Return adds a line (several lines → several tasks). Others submit on
+                // Return. Attaching onSubmit at all makes Return submit, so tasks don't get it.
+                Group {
+                    if type == .task {
+                        TextField("What's on your mind? One task per line to add several at once.", text: $text, axis: .vertical)
+                            .lineLimit(1...6)
+                    } else {
+                        TextField("What's on your mind?", text: $text, axis: .vertical)
+                            .lineLimit(1...4)
+                            .submitLabel(.send)
+                            .onSubmit(send)
+                    }
+                }
                 .font(.system(size: 16))
                 .focused($focused)
-                .submitLabel(type == .task ? .return : .send)
-                .onSubmit { if type != .task { send() } }
                 .padding(.horizontal, 18)
                 .padding(.vertical, 15)
                 .background(Theme.field, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -68,6 +77,16 @@ struct CapturePanel: View {
                         .strokeBorder(Theme.primary, lineWidth: 1.5)
                 }
 
+                if trimmed.isEmpty {
+                    Button(action: onVoice) {
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Theme.primaryOn)
+                            .frame(width: 46, height: 46)
+                            .background(Theme.primary, in: Circle())
+                    }
+                    .accessibilityLabel("Capture by voice")
+                } else {
                 Button(action: send) {
                     Image(systemName: "arrow.up")
                         .font(.system(size: 18, weight: .bold))
@@ -78,6 +97,7 @@ struct CapturePanel: View {
                 .disabled(sending || trimmed.isEmpty)
                 .opacity(sending || trimmed.isEmpty ? 0.5 : 1)
                 .accessibilityLabel("Add")
+                }
             }
         }
         .padding(.horizontal, 20)

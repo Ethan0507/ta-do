@@ -23,11 +23,13 @@ final class HomeModel {
         // Show what's there straight away; the day prep (timezone sync + today's repeats)
         // runs alongside and the list refreshes once it lands.
         async let prepared: String? = try? DayService.prepareDay(userID: userID)
+        async let settingsLoaded: Void = AppSettings.shared.load(userID: userID)
         await load()
         if let zone = await prepared {
             timezone = zone
             await load()
         }
+        await settingsLoaded
     }
 
     func load() async {
@@ -47,8 +49,11 @@ final class HomeModel {
     }
 
     /// One entry, or — for tasks — one per non-empty line, all landing at the top.
+    /// One entry, or — for tasks — one per non-empty line, all landing at the top of
+    /// that type's list. `type` defaults to the list currently shown.
     @discardableResult
-    func capture(_ text: String) async -> Bool {
+    func capture(_ text: String, as type: EntryType? = nil) async -> Bool {
+        let type = type ?? self.type
         var lines = [text.trimmingCharacters(in: .whitespacesAndNewlines)]
         if type == .task {
             lines = text.split(whereSeparator: \.isNewline)
@@ -58,8 +63,9 @@ final class HomeModel {
         lines = lines.filter { !$0.isEmpty }
         guard !lines.isEmpty else { return true }
 
-        let top = EntryService.topPosition(above: entries)
         do {
+            let current = type == self.type ? entries : try await EntryService.fetchToday(type)
+            let top = EntryService.topPosition(above: current)
             for (index, line) in lines.enumerated() {
                 let position = top - EntryService.positionGap * Double(lines.count - 1 - index)
                 try await EntryService.create(userID: userID, type: type, content: line, position: position)
@@ -71,6 +77,20 @@ final class HomeModel {
         }
         await load()
         return true
+    }
+
+    /// Moves an entry within today's list (drag to reorder), using fractional positions
+    /// like the web app so only the moved row is written.
+    func move(from source: IndexSet, to destination: Int) async {
+        var reordered = entries
+        reordered.move(fromOffsets: source, toOffset: destination)
+        guard let moved = source.first.map({ entries[$0] }),
+              let newIndex = reordered.firstIndex(where: { $0.id == moved.id }) else { return }
+        let position = EntryService.reorderedPosition(reordered, index: newIndex)
+        reordered[newIndex].position = position
+        entries = reordered
+        do { try await EntryService.setPosition(moved.id, position) } catch { self.error = error.localizedDescription }
+        await load()
     }
 
     func setDone(_ entry: Entry, _ done: Bool) async {

@@ -31,6 +31,31 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Tah-doh</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>tah doh</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Tado</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>tah doe</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Ta-do app</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>tah doh app</string>
+		</dict>
+	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Ta-do listens while you capture a thought, task or goal by voice.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Ta-do uses Apple's speech recognition to turn what you say into a thought, task or goal.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

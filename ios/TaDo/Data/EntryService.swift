@@ -55,6 +55,50 @@ enum EntryService {
             .value
     }
 
+    /// Library: everything except tasks generated from a repeating template (those live on
+    /// Home only — the template represents the series here). Newest first.
+    static func fetchLibrary(includeArchived: Bool) async throws -> [Entry] {
+        var query = supabase.from("entries").select().eq("is_generated", value: false)
+        if !includeArchived { query = query.is("archived_at", value: nil) }
+        return try await query.order("created_at", ascending: false).execute().value
+    }
+
+    static let upcomingPageSize = 20
+
+    /// One page of open tasks regardless of date: dated soonest-first, then undated newest-first.
+    /// Excludes templates and generated tasks from past days.
+    static func fetchUpcoming(offset: Int) async throws -> [Entry] {
+        try await supabase
+            .from("entries")
+            .select()
+            .eq("type", value: "task")
+            .eq("task_status", value: "open")
+            .eq("is_recurrence_template", value: false)
+            .or("is_generated.eq.false,due_date.gte.\(AppDay.today())")
+            .is("archived_at", value: nil)
+            .order("due_date", ascending: true, nullsFirst: false)
+            .order("created_at", ascending: false)
+            .range(from: offset, to: offset + upcomingPageSize - 1)
+            .execute()
+            .value
+    }
+
+    /// Fractional position for an entry dropped at `index` in an already-reordered list.
+    static func reorderedPosition(_ ordered: [Entry], index: Int) -> Double {
+        let prev = index > 0 ? ordered[index - 1].position : nil
+        let next = index + 1 < ordered.count ? ordered[index + 1].position : nil
+        switch (prev, next) {
+        case (nil, nil): return 0
+        case (nil, let next?): return next - positionGap
+        case (let prev?, nil): return prev + positionGap
+        case (let prev?, let next?): return (prev + next) / 2
+        }
+    }
+
+    static func setPosition(_ id: UUID, _ position: Double) async throws {
+        try await update(id, ["position": .double(position)])
+    }
+
     /// Position that puts a new entry above everything currently listed.
     static func topPosition(above entries: [Entry]) -> Double {
         (entries.first?.position ?? positionGap) - positionGap

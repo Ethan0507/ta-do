@@ -55,3 +55,41 @@ struct Entry: Codable, Identifiable, Hashable {
         }
     }
 }
+
+struct Category: Codable, Identifiable, Hashable {
+    let id: UUID
+    let userID: UUID?
+    var name: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case userID = "user_id"
+    }
+}
+
+/// `habits.recurrence_rule` — see docs/schema.md. Every rule has at most one optional time.
+struct RecurrenceRule: Codable, Hashable {
+    enum Freq: String, Codable, CaseIterable { case daily, weekly, monthly, custom }
+
+    var freq: Freq
+    var weekday: Int?          // weekly: 0 = Sunday … 6 = Saturday
+    var dayOfMonth: Int?       // monthly: 1–31
+    var weekdays: [Int]?       // custom
+    var time: String?          // "HH:MM"
+
+    enum CodingKeys: String, CodingKey {
+        case freq, weekday, weekdays, time
+        case dayOfMonth = "day_of_month"
+    }
+}
+
+struct Habit: Codable, Identifiable {
+    let id: UUID
+    var title: String
+    var recurrenceRule: RecurrenceRule
+
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case recurrenceRule = "recurrence_rule"
+    }
+}
