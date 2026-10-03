@@ -10,7 +10,7 @@ import {
   updateEntryNotes,
   updateEntryType,
 } from '../lib/entries'
-import { fetchActiveHabitIds, fetchHabit, fetchRecurrenceTemplate, setEntryRecurrence } from '../lib/habits'
+import { fetchHabit, fetchRecurrenceTemplate, setEntryRecurrence } from '../lib/habits'
 import { createCategory } from '../lib/categories'
 import { CategoryPicker } from './CategoryPicker'
 import { TypeSelector } from './TypeSelector'
@@ -23,7 +23,8 @@ interface EntryDetailProps {
   categoryIds: string[]
   onClose: () => void
   onChanged: () => void
-  onOpenEntry: (entry: Entry) => void
+  /** Opens a generated task's template where templates live (Library). */
+  onOpenTemplate?: (template: Entry) => void
 }
 
 function sameIds(a: string[], b: string[]): boolean {
@@ -32,15 +33,17 @@ function sameIds(a: string[], b: string[]): boolean {
   return a.every((id) => setB.has(id))
 }
 
-export function EntryDetail({ entry, userId, categories, categoryIds, onClose, onChanged, onOpenEntry }: EntryDetailProps) {
+export function EntryDetail({ entry, userId, categories, categoryIds, onClose, onChanged, onOpenTemplate }: EntryDetailProps) {
   const isTemplate = entry.is_recurrence_template
-  const isOccurrence = Boolean(entry.habit_id) && !isTemplate
+  const isOccurrence = entry.is_generated
   const [content, setContent] = useState(entry.content)
   const [notes, setNotes] = useState(entry.notes ?? '')
   const [type, setType] = useState<EntryType>(entry.type)
   const [dueDate, setDueDate] = useState(entry.due_date ?? '')
   const [rule, setRule] = useState<RecurrenceRule | null>(null)
   const [initialRule, setInitialRule] = useState<RecurrenceRule | null>(null)
+  const [template, setTemplate] = useState<Entry | null>(null)
+  const [saving, setSaving] = useState(false)
   const [localCategoryIds, setLocalCategoryIds] = useState<string[]>(categoryIds)
   const [detailsOpen, setDetailsOpen] = useState(Boolean(entry.notes) || categoryIds.length > 0)
   const [isDone, setIsDone] = useState(
@@ -55,23 +58,22 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
   useEffect(() => {
     let cancelled = false
     async function loadRecurrence() {
-      if (!entry.habit_id || !isTemplate) return
-      const [habit, activeIds] = await Promise.all([fetchHabit(entry.habit_id), fetchActiveHabitIds([entry.habit_id])])
-      if (cancelled || !habit || !activeIds.has(entry.habit_id)) return
-      setRule(habit.recurrence_rule)
-      setInitialRule(habit.recurrence_rule)
+      if (!entry.habit_id) return
+      if (isTemplate) {
+        const habit = await fetchHabit(entry.habit_id)
+        if (cancelled || !habit) return
+        setRule(habit.recurrence_rule)
+        setInitialRule(habit.recurrence_rule)
+      } else if (isOccurrence) {
+        const found = await fetchRecurrenceTemplate(entry.habit_id)
+        if (!cancelled) setTemplate(found)
+      }
     }
     loadRecurrence()
     return () => {
       cancelled = true
     }
-  }, [entry.habit_id, isTemplate])
-
-  async function handleOpenTemplate() {
-    if (!entry.habit_id) return
-    const template = await fetchRecurrenceTemplate(entry.habit_id)
-    if (template) onOpenEntry(template)
-  }
+  }, [entry.habit_id, isTemplate, isOccurrence])
 
   const originalIsDone = entry.type === 'task' ? entry.task_status === 'done' : entry.type === 'goal' ? entry.goal_status === 'achieved' : false
 
@@ -88,16 +90,28 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
     !sameIds(localCategoryIds, categoryIds)
 
   async function handleSave() {
+    if (saving) return
+    setSaving(true)
+    try {
+      await saveChanges()
+    } finally {
+      setSaving(false)
+    }
+    onChanged()
+    onClose()
+  }
+
+  async function saveChanges() {
     if (type !== entry.type) {
       await updateEntryType(entry.id, type)
     }
     if (type === 'task') {
-      await setTaskStatus(entry.id, isDone ? 'done' : 'open')
+      // Only on an actual toggle, so saving notes on a missed task doesn't reopen it.
+      if (!isTemplate && type === entry.type && isDone !== originalIsDone) {
+        await setTaskStatus(entry.id, isDone ? 'done' : 'open')
+      }
       if (!isTemplate) {
         await updateEntryDueDate(entry.id, dueDate || null)
-      }
-      if (!isOccurrence && (ruleChanged || templateContentChanged)) {
-        await setEntryRecurrence(entry.id, userId, content.trim() || entry.content, rule, entry.habit_id)
       }
     } else if (type === 'goal') {
       await setGoalStatus(entry.id, isDone ? 'achieved' : 'ongoing')
@@ -111,8 +125,10 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
     if (!sameIds(localCategoryIds, categoryIds)) {
       await setEntryCategories(entry.id, localCategoryIds)
     }
-    onChanged()
-    onClose()
+    // Last, so the template is fully saved before today's task is copied from it.
+    if (type === 'task' && !isOccurrence && (ruleChanged || templateContentChanged)) {
+      await setEntryRecurrence(entry.id, userId, content.trim() || entry.content, rule, entry.habit_id)
+    }
   }
 
   async function handleArchiveToggle() {
@@ -139,7 +155,14 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
           </button>
         </div>
 
-        <TypeSelector value={type} onChange={handleTypeChange} />
+        {isTemplate ? (
+          <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-text-muted)]">
+            <RepeatIcon />
+            Repeating task — changes apply to tasks created from now on
+          </div>
+        ) : (
+          <TypeSelector value={type} onChange={handleTypeChange} />
+        )}
 
         <textarea
           value={content}
@@ -160,25 +183,20 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
           </label>
         )}
 
-        {type === 'task' && isOccurrence && (
+        {type === 'task' && isOccurrence && template && onOpenTemplate && (
           <button
             type="button"
-            onClick={handleOpenTemplate}
+            onClick={() => onOpenTemplate(template)}
             className="flex w-fit items-center gap-1.5 rounded-full bg-white/45 px-3.5 py-1.5 text-xs font-bold text-[var(--color-primary)]"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 2.1l4 4-4 4" />
-              <path d="M3 12.1v-2a4 4 0 0 1 4-4h14" />
-              <path d="M7 21.9l-4-4 4-4" />
-              <path d="M21 11.9v2a4 4 0 0 1-4 4H3" />
-            </svg>
+            <RepeatIcon />
             Edit repeating task
           </button>
         )}
 
         {type === 'task' && !isOccurrence && <RepeatPicker value={rule} dueDate={dueDate} onChange={setRule} />}
 
-        {type !== 'thought' && (
+        {type !== 'thought' && !isTemplate && (
           <button
             type="button"
             onClick={() => setIsDone((d) => !d)}
@@ -248,7 +266,8 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
             <button
               type="button"
               onClick={handleSave}
-              className="flex-1 rounded-full bg-[var(--color-primary)] py-2.5 text-sm font-bold text-[var(--color-primary-on)]"
+              disabled={saving}
+              className="flex-1 rounded-full disabled:opacity-60 bg-[var(--color-primary)] py-2.5 text-sm font-bold text-[var(--color-primary-on)]"
             >
               Save changes
             </button>
@@ -262,5 +281,16 @@ export function EntryDetail({ entry, userId, categories, categoryIds, onClose, o
         </div>
       </div>
     </>
+  )
+}
+
+function RepeatIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 2.1l4 4-4 4" />
+      <path d="M3 12.1v-2a4 4 0 0 1 4-4h14" />
+      <path d="M7 21.9l-4-4 4-4" />
+      <path d="M21 11.9v2a4 4 0 0 1-4 4H3" />
+    </svg>
   )
 }

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { deviceTimezone } from './settings'
 
 function randomToken(): string {
   const bytes = new Uint8Array(24)
@@ -24,6 +25,24 @@ export async function regenerateCaptureToken(userId: string): Promise<string> {
   const { error } = await supabase.from('profiles').update({ capture_token_hash: hash }).eq('id', userId)
   if (error) throw error
   return token
+}
+
+/**
+ * Keeps profiles.timezone in step with the device, so "today" means the same thing to the
+ * server as to the app — unless the user picked a timezone manually in Account settings.
+ */
+export async function syncTimezone(userId: string): Promise<void> {
+  const { data: settings, error: settingsError } = await supabase
+    .from('user_settings')
+    .select('timezone_auto')
+    .eq('user_id', userId)
+    .single()
+  if (settingsError) throw settingsError
+  if (!settings.timezone_auto) return
+  const timezone = deviceTimezone()
+  if (!timezone) return
+  const { error } = await supabase.from('profiles').update({ timezone }).eq('id', userId).neq('timezone', timezone)
+  if (error) throw error
 }
 
 export async function fetchOnboardedAt(userId: string): Promise<string | null> {

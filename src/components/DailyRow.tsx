@@ -3,6 +3,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { LeadingActions, SwipeAction, SwipeableListItem, Type } from 'react-swipeable-list'
 import 'react-swipeable-list/dist/styles.css'
 import type { Entry } from '../types'
+import { todayDateString } from '../lib/day'
 
 interface DailyRowProps {
   entry: Entry
@@ -41,11 +42,17 @@ export function DailyRow({ entry, checkable, onCheck, onOpen }: DailyRowProps) {
         <p className="text-[14.5px] font-semibold text-[var(--color-text)]">{entry.content}</p>
         {(entry.due_date || entry.habit_id) && (
           <p className="flex items-center gap-1 text-[11.5px] text-[var(--color-text-muted)]">
-            {entry.due_date && (
-              <span>
-                Due {entry.due_date}
-                {entry.due_time && ` ${entry.due_time.slice(0, 5)}`}
-              </span>
+            {entry.type === 'task' && entry.due_date && entry.due_date < todayDateString() ? (
+              <span className="font-bold text-[var(--color-tertiary)]">Overdue · {entry.due_date}</span>
+            ) : entry.due_date === todayDateString() ? (
+              entry.due_time && <span>Due {entry.due_time.slice(0, 5)}</span>
+            ) : (
+              entry.due_date && (
+                <span>
+                  Due {entry.due_date}
+                  {entry.due_time && ` ${entry.due_time.slice(0, 5)}`}
+                </span>
+              )
             )}
             {entry.habit_id && (
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-label="Repeats">

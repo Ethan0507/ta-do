@@ -9,6 +9,8 @@ import { CaptureSetup } from '../components/CaptureSetup'
 
 interface LibraryProps {
   session: Session
+  /** Opened on arrival, e.g. a template reached via "Edit repeating task" on Home. */
+  initialEntry?: Entry | null
   onBack: () => void
 }
 
@@ -21,17 +23,19 @@ const TYPE_FILTERS: { value: EntryType | 'all'; label: string }[] = [
   { value: 'goal', label: 'Goals' },
 ]
 
-export function Library({ session, onBack }: LibraryProps) {
+export function Library({ session, initialEntry = null, onBack }: LibraryProps) {
   const [entries, setEntries] = useState<Entry[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [entryCategoryIds, setEntryCategoryIds] = useState<Record<string, string[]>>({})
   const [showArchived, setShowArchived] = useState(false)
   const [typeFilter, setTypeFilter] = useState<EntryType | 'all'>('all')
   const [sortMode, setSortMode] = useState<SortMode>('category')
-  const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
+  const [selectedEntry, setSelectedEntry] = useState<Entry | null>(initialEntry)
   const [typeMenuOpen, setTypeMenuOpen] = useState(false)
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
   const [captureSetupOpen, setCaptureSetupOpen] = useState(false)
+  // The detail sheet copies categories into local state on open, so it must wait for them.
+  const [loaded, setLoaded] = useState(false)
 
   const reload = useCallback(async () => {
     const [entryRows, categoryRows, categoryMap] = await Promise.all([
@@ -42,6 +46,7 @@ export function Library({ session, onBack }: LibraryProps) {
     setEntries(entryRows)
     setCategories(categoryRows)
     setEntryCategoryIds(categoryMap)
+    setLoaded(true)
   }, [showArchived])
 
   useEffect(() => {
@@ -225,6 +230,15 @@ export function Library({ session, onBack }: LibraryProps) {
                 >
                   {entry.type === 'thought' ? (
                     <div className="mx-[5.5px] h-2 w-2 shrink-0 rounded-full bg-[var(--color-primary)]" />
+                  ) : entry.is_recurrence_template ? (
+                    <div className="flex h-[19px] w-[19px] shrink-0 items-center justify-center text-[var(--color-primary)]" aria-label="Repeating task">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 2.1l4 4-4 4" />
+                        <path d="M3 12.1v-2a4 4 0 0 1 4-4h14" />
+                        <path d="M7 21.9l-4-4 4-4" />
+                        <path d="M21 11.9v2a4 4 0 0 1-4 4H3" />
+                      </svg>
+                    </div>
                   ) : (
                     <div
                       className={`flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-full ${
@@ -255,7 +269,7 @@ export function Library({ session, onBack }: LibraryProps) {
         </div>
       </div>
 
-      {selectedEntry && (
+      {loaded && selectedEntry && (
         <EntryDetail
           entry={selectedEntry}
           userId={session.user.id}
@@ -263,7 +277,6 @@ export function Library({ session, onBack }: LibraryProps) {
           categoryIds={entryCategoryIds[selectedEntry.id] ?? []}
           onClose={() => setSelectedEntry(null)}
           onChanged={reload}
-          onOpenEntry={setSelectedEntry}
         />
       )}
 

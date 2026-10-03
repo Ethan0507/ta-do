@@ -1,32 +1,19 @@
 import { supabase } from './supabase'
 import type { Entry, EntryType } from '../types'
+import { todayDateString, todayRange } from './day'
 
 export const POSITION_GAP = 1024
 
-function todayDateString(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
-
-function todayRange(): { startISO: string; endISO: string } {
-  const now = new Date()
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const end = new Date(start)
-  end.setDate(end.getDate() + 1)
-  return { startISO: start.toISOString(), endISO: end.toISOString() }
-}
 
 /**
- * Library listing: every entry except a repeating task's generated occurrences
- * (habit_id set but not the template itself) — those would flood Library with
- * months of daily rows. The template row (is_recurrence_template) represents the
- * whole series there instead.
+ * Library listing: every entry except tasks generated from a repeating template —
+ * those live on Home only. The template row represents the whole series here.
  */
 export async function fetchEntries(includeArchived: boolean): Promise<Entry[]> {
   let query = supabase
     .from('entries')
     .select('*')
-    .or('habit_id.is.null,is_recurrence_template.eq.true')
+    .eq('is_generated', false)
     .order('created_at', { ascending: false })
   if (!includeArchived) {
     query = query.is('archived_at', null)
@@ -36,7 +23,11 @@ export async function fetchEntries(includeArchived: boolean): Promise<Entry[]> {
   return data as Entry[]
 }
 
-/** Today's active (not-yet-completed) entries of a given type, in manual order. Excludes recurrence template rows. */
+/**
+ * Today's active entries of a given type, in manual order. Excludes recurrence templates.
+ * Tasks: undated, due today, or overdue — except generated tasks from past days, which
+ * are (or are about to be) marked missed rather than carried over.
+ */
 export async function fetchTodayEntries(type: EntryType): Promise<Entry[]> {
   let query = supabase
     .from('entries')
@@ -49,7 +40,9 @@ export async function fetchTodayEntries(type: EntryType): Promise<Entry[]> {
 
   if (type === 'task') {
     const today = todayDateString()
-    query = query.eq('task_status', 'open').or(`due_date.is.null,due_date.eq.${today}`)
+    query = query
+      .eq('task_status', 'open')
+      .or(`due_date.is.null,due_date.eq.${today},and(due_date.lt.${today},is_generated.eq.false)`)
   } else if (type === 'goal') {
     query = query.eq('goal_status', 'ongoing')
   }
@@ -61,7 +54,7 @@ export async function fetchTodayEntries(type: EntryType): Promise<Entry[]> {
 
 export const UPCOMING_TASKS_PAGE_SIZE = 20
 
-/** One page of open tasks regardless of date, dated ones soonest-first then undated ones newest-first. Excludes recurrence template rows. */
+/** One page of open tasks regardless of date, dated ones soonest-first then undated ones newest-first. Excludes recurrence templates and past generated tasks. */
 export async function fetchUpcomingTasks(offset: number, limit: number = UPCOMING_TASKS_PAGE_SIZE): Promise<Entry[]> {
   const { data, error } = await supabase
     .from('entries')
@@ -69,6 +62,7 @@ export async function fetchUpcomingTasks(offset: number, limit: number = UPCOMIN
     .eq('type', 'task')
     .eq('task_status', 'open')
     .eq('is_recurrence_template', false)
+    .or(`is_generated.eq.false,due_date.gte.${todayDateString()}`)
     .is('archived_at', null)
     .order('due_date', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false })

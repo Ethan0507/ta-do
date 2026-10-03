@@ -1,15 +1,16 @@
 export type EntryType = 'thought' | 'goal' | 'task'
-export type TaskStatus = 'open' | 'done'
+export type TaskStatus = 'open' | 'done' | 'missed'
 export type GoalStatus = 'ongoing' | 'achieved'
 export type PeriodScope = 'week' | 'month' | 'year'
 export type ThemePreference = 'light' | 'dark' | 'auto'
 export type RecurrenceFreq = 'daily' | 'weekly' | 'monthly' | 'custom'
 
+// Every rule carries at most one optional time ("HH:MM") — when the generated task is due.
 export type RecurrenceRule =
-  | { freq: 'daily'; time?: string } // time as "HH:MM", optional
+  | { freq: 'daily'; time?: string }
   | { freq: 'weekly'; weekday: number; time?: string } // weekday: 0 = Sunday .. 6 = Saturday
-  | { freq: 'monthly'; day_of_month: number }
-  | { freq: 'custom'; weekdays: number[]; times: string[] } // times as "HH:MM"
+  | { freq: 'monthly'; day_of_month: number; time?: string }
+  | { freq: 'custom'; weekdays: number[]; time?: string }
 
 export interface Habit {
   id: string
@@ -50,6 +51,7 @@ export interface Entry {
   task_status: TaskStatus | null
   completed_at: string | null
   is_recurrence_template: boolean
+  is_generated: boolean
 
   // Goal-specific
   period_scope: PeriodScope | null

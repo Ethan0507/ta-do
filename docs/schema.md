@@ -1,4 +1,4 @@
-# Ta-do — Schema (Draft v0.3)
+# Ta-do — Schema (Draft v0.4)
 
 Status: core entities resolved; auth + Shortcuts capture shipped and in production; Habit/Routine layer shipped as the recurring-tasks feature; one open question remains (UserSettings fields).
 Last updated: 2026-09-27
@@ -16,7 +16,7 @@ Auth: Supabase Auth, passwordless — email magic link (`signInWithOtp`) as the 
 | id | uuid | Supabase `auth.users` id |
 | email | string | via `auth.users`, not duplicated on `profiles` |
 | created_at | timestamp | |
-| timezone | string | affects what "today" / "this week" means |
+| timezone | string (IANA, e.g. `Asia/Calcutta`) | decides when the user's day starts — both for the app's Home view and for the repeat generator. Synced from the device on every app load while `user_settings.timezone_auto` is true; otherwise set manually in Account settings |
 | status | enum | active / deactivated |
 | capture_token_hash | text, nullable, unique | SHA-256 hash of the per-user iOS Shortcuts capture token; raw value is never stored, only shown once client-side at generation time |
 | onboarded_at | timestamp, nullable | set once the user completes (or dismisses) the first-run Shortcuts setup walkthrough |
@@ -28,9 +28,10 @@ Auth: Supabase Auth, passwordless — email magic link (`signInWithOtp`) as the 
 | id | uuid | |
 | user_id | uuid (FK → User) | |
 | default_altitude | enum | day / week / month / year |
-| (more TBD) | | |
+| theme_preference | enum | light / dark / auto (auto follows the device) — migration `0008` |
+| timezone_auto | boolean, default true | true = `profiles.timezone` follows the device; false = picked manually and left alone — migration `0013` |
 
-**Still open** — see Open Questions below.
+Edited from the **Account settings** sheet (gear button on Home), which currently holds Theme and Timezone.
 
 ## Category
 
@@ -59,17 +60,18 @@ The core object. A brain-dump item; type determines which extra fields apply.
 | notes | text, nullable | freeform longer-form notes, separate from the short `content` line; editable from Entry Detail |
 | created_at | timestamp | immutable |
 | archived_at | timestamp, nullable | null = active; set = hidden from lists, still viewable |
-| habit_id | uuid (FK → Habit, nullable) | set if this Entry was generated from a recurring Habit |
+| habit_id | uuid (FK → Habit, nullable) | on a template: the Habit holding its rule. On a generated task: the Habit it came from (used only for the "Edit repeating task" link; nulled if the Habit is removed) |
 
 Type-specific fields:
 
 | Field | Applies to | Notes |
 |---|---|---|
 | due_date / scheduled_date | Task | drives which daily/weekly list it appears in. **If null, the Task floats in the current daily altitude view by default** — undated/uncategorized entries are meant to surface there, not get lost in Library only |
-| due_time | Task, nullable | time-of-day, only ever set by the recurrence generator (see Habit below) for a `custom` rule's specific times; not manually editable |
-| is_recurrence_template | Task, boolean, default false | true = this row IS a repeating task's series definition, not a dated occurrence — see Habit below |
+| due_time | Task, nullable | time-of-day, only ever set by the recurrence generator from the rule's optional `time`; not manually editable |
+| is_recurrence_template | Task, boolean, default false | true = this row IS a repeating task's template (lives in Library only, never tickable) — see Recurring tasks below |
+| is_generated | Task, boolean, default false | true = this row was created automatically from a template (lives on Home only, never in Library). Stays true even if the template is later removed |
 | priority | Task | for library sorting |
-| status | Task | open / done |
+| status | Task | open / done / **missed** — `missed` is only ever set by the generator, on a generated task left open past its day |
 | completed_at | Task | timestamp, feeds rollup stats |
 | period_scope | Goal | week / month / year |
 | period_identifier | Goal | e.g. 2026-W34, 2026-08, 2026 |
@@ -105,23 +107,34 @@ Many-to-many: **a Habit can contribute to a Goal, and a Goal can have multiple H
 | recurrence_rule | jsonb | see shapes below |
 | created_at | timestamp | |
 
-`recurrence_rule` shapes (one of):
+`recurrence_rule` shapes (one of) — **every rule has at most one optional time**:
 ```jsonc
-{ "freq": "daily" }
-{ "freq": "daily", "time": "09:00" }                    // time is optional
-{ "freq": "weekly", "weekday": 0 }                      // 0 = Sunday .. 6 = Saturday
-{ "freq": "weekly", "weekday": 0, "time": "09:00" }     // time is optional
-{ "freq": "monthly", "day_of_month": 15 }
-{ "freq": "custom", "weekdays": [1, 3, 5], "times": ["09:00", "18:00"] }
+{ "freq": "daily", "time"?: "09:00" }
+{ "freq": "weekly", "weekday": 0, "time"?: "09:00" }          // 0 = Sunday .. 6 = Saturday
+{ "freq": "monthly", "day_of_month": 15, "time"?: "09:00" }   // day 29–31 is skipped in shorter months (calendar logic later)
+{ "freq": "custom", "weekdays": [1, 3, 5], "time"?: "09:00" }
 ```
+(Before migration `0012`, `custom` carried a `times` array — multiple tasks per day. That's gone; `0012` keeps only the first time.)
 
-Created via the "Repeat" picker on a Task Entry's detail sheet (Daily / Weekly / Monthly / Custom, modeled on Reminders.app's repeat UX). Daily and Weekly optionally carry a single time of day (no time = generates any time that day, matching the app's existing no-time-of-day default); Weekly also lets you pick which weekday. Custom requires explicit weekdays and one or more times of day. Flow:
-1. User sets a repeat option on a Task Entry.
-2. A Habit row is created — `title` copied from the Entry's content, `recurrence_rule` set from the picker.
-3. The original Entry's `habit_id` is set to point at the new Habit, and the Entry is marked `is_recurrence_template = true` and undated (`due_date`/`due_time` cleared). It's the series' definition from here on, not an occurrence — its own due date (or lack of one) generally wouldn't match what the rule actually calls for, so it's excluded from Daily/Upcoming views (see "Not stored — computed views" below) while still showing normally in Library, where it represents the whole series. Editing its content there renames all future occurrences (updates `habits.title`); editing its Repeat picker updates the rule.
-4. The new Habit's id is added to the user's **Routine** (see below) — this is also how it becomes active.
-5. A scheduled Postgres job (`generate_habit_entries()`, run via `pg_cron` every 15 minutes — see migrations `0009_recurring_tasks.sql` and `0010_optional_recurrence_time.sql`) creates each new Task Entry on schedule (`is_recurrence_template = false`), independent of whether the prior occurrence was completed. It dedupes per Habit + due_date (+ due_time when a time is set) so a missed or re-run tick never double-generates. Step 3 also fires this generator immediately (best-effort, via RPC) so the first real occurrence appears right away rather than waiting for the next tick.
-6. From a generated occurrence's detail sheet, an "Edit repeating task" button (instead of the Repeat picker directly) opens the template Entry from step 3 — editing the rule or renaming the series happens there, not on an individual dated occurrence.
+### Recurring tasks — specification (agreed 2026-10-03)
+
+**Two kinds of row, never mixed:**
+- **Template** (`is_recurrence_template = true`): the recurring task's config — content, notes, categories, plus the rule on its Habit. Shown **only in Library**. Never tickable. Undated.
+- **Generated task** (`is_generated = true`): an ordinary, fully independent task created from the template for one day. Shown **only on Home** (and Upcoming). Never in Library — open, done or missed.
+
+**Lifecycle:**
+1. A task exists. On its detail sheet the user sets Repeat: Daily / Weekly / Monthly / Custom (weekdays), each with an optional time.
+2. That task becomes the template: a Habit is created for the rule, and the task gets `is_recurrence_template = true`, undated, open. It disappears from Home and stays in Library.
+3. **Generation:** at the start of each day in the user's timezone (`profiles.timezone`, kept in sync from the device on every app load), every active template whose rule matches today gets **one** task for today. Implemented as `generate_habit_entries()` via `pg_cron` every 15 minutes (so it fires shortly after each user's local midnight, including :30/:45-offset timezones) and also called on app load and right after a repeat is set, for the current user only, so Home is never stale. Deduped per Habit + date. **No backfill** — days the job didn't run are simply skipped.
+4. **Everything is copied** from the template onto the generated task at creation time: content, notes, categories, and the rule's time as `due_time`. The time is *when it's due*, not when it appears — it appears at the start of the day.
+5. **Independence:** once created, a generated task is its own task. Editing, completing, notes etc. affect only that task. Editing the template affects only tasks generated *after* the edit — today's already-created task is untouched.
+6. **Missed:** a generated task still open after its day ends is set to `missed` by the generator. It leaves Home. There's no catching up — you do it next time it's generated. (Ordinary, non-generated tasks are different: if past their due date they stay on Home as **overdue**.)
+7. **Edit link:** a generated task's detail sheet shows "Edit repeating task" while its template still exists; it switches to Library and opens the template there.
+8. **Stop repeating:** setting the template's Repeat to None turns it back into a normal task (template flag cleared, Habit deleted). It reappears on Home as an undated task. Already-generated tasks are untouched and still never appear in Library.
+9. **Archiving the template** stops generation; unarchiving resumes it.
+10. **Not yet:** pausing (planned later), calendar-aware monthly rules.
+
+**Flow detail:** the Habit row (`title` kept in sync with the template's content) is added to the user's **Routine**; Routine membership is what makes it active. Generator source: `supabase/migrations/0012_recurrence_rework.sql` (supersedes the generator in `0009`/`0010`).
 
 **Streak is not a stored field.** It's computed by reading `completed_at` across all Entries sharing a given `habit_id`, so it can never drift out of sync with actual entry data — no `streak_count` column needed on Habit itself.
 
@@ -139,11 +152,11 @@ Intent: the Routine is a lightweight container that acts as a **filter over "hab
 | RoutineHabit | routine_id | uuid (FK → Routine) | |
 | RoutineHabit | habit_id | uuid (FK → Habit) | |
 
-Flow: a user starts with an empty Routine, created lazily (one per user) the first time a repeat is set. As Entries are converted to Habits, the new Habit's id is added to the Routine (see Habit flow above, step 4). Removing a habit_id from RoutineHabit pauses it (stops new Entry generation, keeps history) without deleting the Habit — this is what clearing the "Repeat" option on a Task does.
+Flow: a user starts with an empty Routine, created lazily (one per user) the first time a repeat is set. As Entries are converted to Habits, the new Habit's id is added to the Routine (see Habit flow above, step 4). Removing a habit_id from RoutineHabit would pause it (stops new Entry generation, keeps history) without deleting the Habit — reserved for the future Pause feature. Clearing the "Repeat" option now deletes the Habit instead (see spec step 8).
 
 Visualization: habits within the Routine can be grouped by recurrence (daily / weekly / monthly, etc.) for display — this is a query concern, not a schema one.
 
-**Resolved for the recurring-tasks feature:** one Routine per user (lazily created); removing a habit from the Routine stops generation immediately (no in-flight occurrence is force-completed); pausing and "done forever" are the same state today — there's no separate archival of a Habit definition yet.
+**Resolved:** one Routine per user (lazily created). Stopping a repeat deletes its Habit; Routine membership stays as the hook for a future Pause.
 
 ## PeriodTarget
 
@@ -190,12 +203,13 @@ No uniqueness constraint on (user_id, period_type, period_identifier) — a sing
 
 - **Altitude View**: a query over Entry (+ Category, + PeriodTarget) filtered/grouped by day/week/month/year. Not a table. Undated Tasks default into the current daily altitude view (the "parking lot" — this is the default view for most users). Exception: an entry with `is_recurrence_template = true` never floats in here regardless of its (null) due date — it's a series definition, not an occurrence.
 - **Rollup/Summary**: computed aggregation of Entry completion/status for a given period + category, shown alongside PeriodTarget. For Tasks this reads `status`/`completed_at`; for Goals it reads `status`/`achieved_at`, optionally factoring in linked Habits via GoalHabit. Not a table.
-- **Recurrence template/occurrence split**: Daily and Upcoming views query `is_recurrence_template = false` (occurrences only); Library queries `habit_id IS NULL OR is_recurrence_template = true` (the template row or a plain non-repeating entry — never a generated occurrence, which would flood Library over time). Not separate tables, just complementary filters over the same `entries` rows.
+- **Recurrence template/generated split**: Home and Upcoming query `is_recurrence_template = false`, and only show generated tasks for today or later (past ones are about to be / already marked missed); Library queries `is_generated = false` (templates and ordinary entries only). Not separate tables, just complementary filters over the same `entries` rows.
+- **Home task list**: open tasks with no due date, due today, or overdue (past due date, ordinary tasks only).
 
 ---
 
 ## Resolved
-- ~~Habit as own entity vs. Task + recurrence rule~~ → own entity, created via "track as habit" action on a Task; streak computed, not stored. (Routine layer on top still draft — see above.)
+- ~~Habit as own entity vs. Task + recurrence rule~~ → own entity, created via "track as habit" action on a Task; streak computed, not stored. 
 - ~~PeriodTarget: multiple per period?~~ → yes, no uniqueness constraint.
 - Category `kind` field → removed, redundant with `user_id IS NULL`.
 - Entry `type` default → `thought`.
@@ -213,4 +227,4 @@ No uniqueness constraint on (user_id, period_type, period_identifier) — a sing
 
 ## Open questions still to resolve
 
-1. UserSettings — what actually belongs here beyond `default_altitude`
+1. UserSettings — anything beyond `default_altitude`, theme and timezone (add as features need them)

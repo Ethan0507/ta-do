@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { LeadingActions, SwipeAction, SwipeableListItem, Type } from 'react-swipeable-list'
 import 'react-swipeable-list/dist/styles.css'
 import type { Entry } from '../types'
+import { daysFromToday } from '../lib/day'
 import { fetchUpcomingTasks, setTaskStatus, UPCOMING_TASKS_PAGE_SIZE } from '../lib/entries'
 
 interface UpcomingTasksSheetProps {
@@ -12,10 +13,8 @@ interface UpcomingTasksSheetProps {
 
 function dateGroupLabel(dueDate: string | null): string {
   if (!dueDate) return 'No due date'
+  const diffDays = daysFromToday(dueDate)
   const due = new Date(dueDate + 'T00:00:00')
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const diffDays = Math.round((due.getTime() - today.getTime()) / 86400000)
   if (diffDays < 0) return 'Overdue'
   if (diffDays === 0) return 'Today'
   if (diffDays === 1) return 'Tomorrow'

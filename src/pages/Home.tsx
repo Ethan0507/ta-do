@@ -22,19 +22,21 @@ import { DailyList } from '../components/DailyList'
 import { CaptureFab } from '../components/CaptureFab'
 import { EntryDetail } from '../components/EntryDetail'
 import { UpcomingTasksSheet } from '../components/UpcomingTasksSheet'
+import { AccountSettings } from '../components/AccountSettings'
 
 interface HomeProps {
   session: Session
   onOpenLibrary: () => void
+  onOpenTemplate: (template: Entry) => void
+  refreshKey: number
+  onTimezoneChanged: () => void
   theme: {
     preference: ThemePreference
-    resolvedTheme: 'light' | 'dark'
     setPreference: (preference: ThemePreference) => void
-    toggle: () => void
   }
 }
 
-export function Home({ session, onOpenLibrary, theme }: HomeProps) {
+export function Home({ session, onOpenLibrary, onOpenTemplate, refreshKey, onTimezoneChanged, theme }: HomeProps) {
   const [type, setType] = useState<EntryType>('thought')
   const [entries, setEntries] = useState<Entry[]>([])
   const [completedEntries, setCompletedEntries] = useState<Entry[]>([])
@@ -43,6 +45,7 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
   const [entryCategoryIds, setEntryCategoryIds] = useState<Record<string, string[]>>({})
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
   const [showUpcoming, setShowUpcoming] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   const reload = useCallback(async () => {
     const [todayEntries, categoryRows, categoryMap] = await Promise.all([
@@ -62,7 +65,7 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
 
   useEffect(() => {
     reload()
-  }, [reload])
+  }, [reload, refreshKey])
 
   async function handleCapture(content: string) {
     await createEntry(session.user.id, type, content, null, getTopPosition(entries))
@@ -113,25 +116,14 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={theme.toggle}
+              onClick={() => setShowSettings(true)}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--glass-fill)] backdrop-blur-xl"
-              aria-label={`Theme: ${theme.preference}`}
+              aria-label="Account settings"
             >
-              {theme.preference === 'dark' ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="4.5" />
-                  <path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
-                </svg>
-              ) : theme.preference === 'light' ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" />
-                </svg>
-              ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="8.5" />
-                  <path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="var(--color-text)" stroke="none" />
-                </svg>
-              )}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+              </svg>
             </button>
             <button
               type="button"
@@ -184,6 +176,16 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
         <UpcomingTasksSheet onClose={() => setShowUpcoming(false)} onChanged={reload} onOpenEntry={setSelectedEntry} />
       )}
 
+      {showSettings && (
+        <AccountSettings
+          userId={session.user.id}
+          themePreference={theme.preference}
+          onThemeChange={theme.setPreference}
+          onTimezoneChanged={onTimezoneChanged}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+
       {selectedEntry && (
         <EntryDetail
           entry={selectedEntry}
@@ -192,7 +194,7 @@ export function Home({ session, onOpenLibrary, theme }: HomeProps) {
           categoryIds={entryCategoryIds[selectedEntry.id] ?? []}
           onClose={() => setSelectedEntry(null)}
           onChanged={reload}
-          onOpenEntry={setSelectedEntry}
+          onOpenTemplate={onOpenTemplate}
         />
       )}
     </div>

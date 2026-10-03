@@ -1,4 +1,5 @@
 import type { RecurrenceFreq, RecurrenceRule } from '../types'
+import { todayDateString } from '../lib/day'
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 const FREQ_OPTIONS: { value: RecurrenceFreq | 'none'; label: string }[] = [
@@ -16,7 +17,7 @@ interface RepeatPickerProps {
 }
 
 function referenceDate(dueDate: string): Date {
-  return dueDate ? new Date(`${dueDate}T00:00:00`) : new Date()
+  return new Date(`${dueDate || todayDateString()}T00:00:00`)
 }
 
 function WeekdayChips({ isSelected, onToggle }: { isSelected: (day: number) => boolean; onToggle: (day: number) => void }) {
@@ -41,16 +42,18 @@ function WeekdayChips({ isSelected, onToggle }: { isSelected: (day: number) => b
 export function RepeatPicker({ value, dueDate, onChange }: RepeatPickerProps) {
   function selectFreq(next: RecurrenceFreq | 'none') {
     if (next === value?.freq) return
+    // Switching between Daily/Weekly/etc. keeps the time that's already set.
+    const time = value?.time ? { time: value.time } : {}
     if (next === 'none') {
       onChange(null)
     } else if (next === 'daily') {
-      onChange({ freq: 'daily' })
+      onChange({ freq: 'daily', ...time })
     } else if (next === 'weekly') {
-      onChange({ freq: 'weekly', weekday: referenceDate(dueDate).getDay() })
+      onChange({ freq: 'weekly', weekday: referenceDate(dueDate).getDay(), ...time })
     } else if (next === 'monthly') {
-      onChange({ freq: 'monthly', day_of_month: referenceDate(dueDate).getDate() })
+      onChange({ freq: 'monthly', day_of_month: referenceDate(dueDate).getDate(), ...time })
     } else {
-      onChange({ freq: 'custom', weekdays: [referenceDate(dueDate).getDay()], times: ['09:00'] })
+      onChange({ freq: 'custom', weekdays: [referenceDate(dueDate).getDay()], ...time })
     }
   }
 
@@ -59,17 +62,19 @@ export function RepeatPicker({ value, dueDate, onChange }: RepeatPickerProps) {
     onChange({ ...value, weekday: day })
   }
 
-  function toggleSingleTime() {
-    if (value?.freq !== 'daily' && value?.freq !== 'weekly') return
+  function toggleTime() {
+    if (!value) return
     if (value.time) {
-      onChange(value.freq === 'daily' ? { freq: 'daily' } : { freq: 'weekly', weekday: value.weekday })
+      const withoutTime = { ...value }
+      delete withoutTime.time
+      onChange(withoutTime)
     } else {
       onChange({ ...value, time: '09:00' })
     }
   }
 
-  function updateSingleTime(time: string) {
-    if (value?.freq !== 'daily' && value?.freq !== 'weekly') return
+  function updateTime(time: string) {
+    if (!value) return
     onChange({ ...value, time })
   }
 
@@ -77,23 +82,6 @@ export function RepeatPicker({ value, dueDate, onChange }: RepeatPickerProps) {
     if (value?.freq !== 'custom') return
     const next = value.weekdays.includes(day) ? value.weekdays.filter((d) => d !== day) : [...value.weekdays, day].sort()
     onChange({ ...value, weekdays: next })
-  }
-
-  function updateCustomTime(index: number, time: string) {
-    if (value?.freq !== 'custom') return
-    const times = [...value.times]
-    times[index] = time
-    onChange({ ...value, times })
-  }
-
-  function addCustomTime() {
-    if (value?.freq !== 'custom') return
-    onChange({ ...value, times: [...value.times, '09:00'] })
-  }
-
-  function removeCustomTime(index: number) {
-    if (value?.freq !== 'custom') return
-    onChange({ ...value, times: value.times.filter((_, i) => i !== index) })
   }
 
   return (
@@ -124,11 +112,18 @@ export function RepeatPicker({ value, dueDate, onChange }: RepeatPickerProps) {
         </div>
       )}
 
-      {(value?.freq === 'daily' || value?.freq === 'weekly') && (
+      {value?.freq === 'custom' && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-semibold text-[var(--color-text-muted)]">Days of week</span>
+          <WeekdayChips isSelected={(day) => value.weekdays.includes(day)} onToggle={toggleCustomWeekday} />
+        </div>
+      )}
+
+      {value && (
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={toggleSingleTime}
+            onClick={toggleTime}
             className={`rounded-full px-3.5 py-1.5 text-xs font-bold ${
               value.time ? 'bg-[var(--color-primary)] text-[var(--color-primary-on)]' : 'bg-white/45 text-[var(--color-text)]'
             }`}
@@ -139,47 +134,10 @@ export function RepeatPicker({ value, dueDate, onChange }: RepeatPickerProps) {
             <input
               type="time"
               value={value.time}
-              onChange={(e) => updateSingleTime(e.target.value)}
+              onChange={(e) => updateTime(e.target.value)}
               className="rounded-xl border border-[var(--glass-border)] bg-white/45 px-3 py-1.5 text-sm text-[var(--color-text)]"
             />
           )}
-        </div>
-      )}
-
-      {value?.freq === 'custom' && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-[var(--glass-border)] bg-white/30 p-3">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-[var(--color-text-muted)]">Days of week</span>
-            <WeekdayChips isSelected={(day) => value.weekdays.includes(day)} onToggle={toggleCustomWeekday} />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-[var(--color-text-muted)]">Times of day</span>
-            <div className="flex flex-col gap-1.5">
-              {value.times.map((time, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    value={time}
-                    onChange={(e) => updateCustomTime(index, e.target.value)}
-                    className="rounded-xl border border-[var(--glass-border)] bg-white/45 px-3 py-1.5 text-sm text-[var(--color-text)]"
-                  />
-                  {value.times.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeCustomTime(index)}
-                      className="text-xs font-bold text-[var(--color-text-faint)]"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button type="button" onClick={addCustomTime} className="w-fit text-xs font-bold text-[var(--color-primary)]">
-                + Add time
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>
